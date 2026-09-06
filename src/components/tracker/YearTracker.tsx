@@ -13,14 +13,21 @@ import {
   SECTOR_ANGLE,
 } from '../../utils/geometry';
 import { MONTH_SHORT_NAMES } from '../../utils/dateUtils';
-import { getGridBorderColor, PALETTES } from '../../utils/colors';
-import type { DayProgress, CirclePalette } from '../../types';
-import { ZoomIn, ZoomOut, RotateCcw, Palette, Check } from 'lucide-react';
+import {
+  getGridBorderColor,
+  getPalettesByTone,
+  resolvePalette,
+  BRIGHT_PALETTES,
+  DARK_PALETTES,
+} from '../../utils/colors';
+import type { DayProgress } from '../../types';
+import { ZoomIn, ZoomOut, RotateCcw, Palette, Check, Sun, Moon } from 'lucide-react';
 
 export const YearTracker: React.FC = () => {
   const {
     year,
-    pageTheme,
+    circleTone,
+    setCircleTone,
     circlePalette,
     setCirclePalette,
     selectedDate,
@@ -57,7 +64,7 @@ export const YearTracker: React.FC = () => {
     return calculateRingMetrics(12, INNER_BOUND_RADIUS, OUTER_BOUND_RADIUS);
   }, []);
 
-  const borderColor = useMemo(() => getGridBorderColor(pageTheme), [pageTheme]);
+  const borderColor = useMemo(() => getGridBorderColor(circleTone), [circleTone]);
   const monthColumn = useMemo(() => getMonthColumnAngles(), []);
 
   // Handlers for cell hover
@@ -101,8 +108,9 @@ export const YearTracker: React.FC = () => {
     setPan({ x: 0, y: 0 });
   };
 
-  const monthCellBg = pageTheme === 'dark' ? '#181e1a' : '#ece8df';
-  const monthTextColor = pageTheme === 'dark' ? '#e2e8f0' : '#1c1917';
+  const monthCellBg = circleTone === 'dark' ? '#181e1a' : '#ece8df';
+  const monthTextColor = circleTone === 'dark' ? '#e2e8f0' : '#1c1917';
+  const activePal = resolvePalette(circlePalette, circleTone);
 
   return (
     <div
@@ -143,7 +151,7 @@ export const YearTracker: React.FC = () => {
         <div className="relative">
           <button
             onClick={() => setShowPaletteMenu(!showPaletteMenu)}
-            title="Circle Color Themes"
+            title="Circle Color Themes (Bright & Dark)"
             className="p-1.5 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 rounded-lg transition-colors cursor-pointer flex items-center justify-center"
           >
             <Palette size={16} />
@@ -155,32 +163,84 @@ export const YearTracker: React.FC = () => {
                 className="fixed inset-0 z-30"
                 onClick={() => setShowPaletteMenu(false)}
               />
-              <div className="absolute right-full mr-2 top-0 w-44 bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-xl shadow-xl p-2 z-40 animate-in zoom-in-95 duration-100">
-                <div className="text-[10px] font-bold uppercase tracking-wider text-stone-400 dark:text-stone-500 px-2 py-1">
-                  Circle Colors
+              <div className="absolute right-full mr-2 top-0 w-56 bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-2xl shadow-2xl p-2.5 z-40 animate-in zoom-in-95 duration-100">
+                <div className="flex items-center justify-between pb-1.5 mb-2 border-b border-stone-100 dark:border-stone-800">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">
+                    Circle Theme
+                  </span>
                 </div>
-                <div className="space-y-1 mt-1">
-                  {(Object.keys(PALETTES) as CirclePalette[]).map((pKey) => {
-                    const pal = PALETTES[pKey];
-                    const isSelected = circlePalette === pKey;
+
+                {/* Circle Bright vs Dark Tone Toggle */}
+                <div className="grid grid-cols-2 gap-1 p-1 bg-stone-100 dark:bg-stone-800 rounded-xl mb-2.5">
+                  <button
+                    onClick={() => {
+                      setCircleTone('bright');
+                      if (!BRIGHT_PALETTES.some((p) => p.id === circlePalette)) {
+                        setCirclePalette('sage_bright');
+                      }
+                    }}
+                    className={`flex items-center justify-center gap-1.5 py-1 px-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                      circleTone === 'bright'
+                        ? 'bg-white text-stone-900 shadow-xs font-semibold'
+                        : 'text-stone-500 hover:text-stone-800 dark:hover:text-stone-200'
+                    }`}
+                  >
+                    <Sun size={13} className="text-amber-500" />
+                    <span>Bright</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setCircleTone('dark');
+                      if (!DARK_PALETTES.some((p) => p.id === circlePalette)) {
+                        setCirclePalette('forest_dark');
+                      }
+                    }}
+                    className={`flex items-center justify-center gap-1.5 py-1 px-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                      circleTone === 'dark'
+                        ? 'bg-stone-900 text-stone-100 dark:bg-stone-700 shadow-xs font-semibold'
+                        : 'text-stone-500 hover:text-stone-800 dark:hover:text-stone-200'
+                    }`}
+                  >
+                    <Moon size={13} className="text-emerald-400" />
+                    <span>Dark</span>
+                  </button>
+                </div>
+
+                {/* Dynamic Options for Selected Tone */}
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-stone-400 dark:text-stone-500 px-1 mb-1">
+                  {circleTone === 'bright' ? 'Bright Palettes' : 'Dark Palettes'}
+                </div>
+
+                <div className="space-y-1">
+                  {getPalettesByTone(circleTone).map((pal) => {
+                    const isSelected = activePal.id === pal.id;
                     return (
                       <button
-                        key={pKey}
+                        key={pal.id}
                         onClick={() => {
-                          setCirclePalette(pKey);
-                          setShowPaletteMenu(false);
+                          setCirclePalette(pal.id);
                         }}
-                        className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                        className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer ${
                           isSelected
-                            ? 'bg-emerald-50 text-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-300'
-                            : 'text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800'
+                            ? 'bg-emerald-50 text-emerald-900 dark:bg-emerald-950/70 dark:text-emerald-300 font-semibold ring-1 ring-emerald-500/30'
+                            : 'text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800/70'
                         }`}
                       >
                         <div className="flex items-center gap-2">
-                          <span
-                            className="w-3.5 h-3.5 rounded-full border border-black/10 dark:border-white/10"
-                            style={{ backgroundColor: pal.previewColor }}
-                          />
+                          <div className="flex items-center -space-x-1">
+                            <span
+                              className="w-3 h-3 rounded-full border border-black/10 dark:border-white/10"
+                              style={{ backgroundColor: pal.levels[1].color }}
+                            />
+                            <span
+                              className="w-3 h-3 rounded-full border border-black/10 dark:border-white/10"
+                              style={{ backgroundColor: pal.levels[4].color }}
+                            />
+                            <span
+                              className="w-3 h-3 rounded-full border border-black/10 dark:border-white/10 z-10"
+                              style={{ backgroundColor: pal.levels[6].color }}
+                            />
+                          </div>
                           <span>{pal.name}</span>
                         </div>
                         {isSelected && <Check size={13} className="text-emerald-600 dark:text-emerald-400" />}

@@ -1,10 +1,10 @@
 import React from 'react';
 import { useTracker } from '../../context/TrackerContext';
-import { PALETTES } from '../../utils/colors';
+import { resolvePalette } from '../../utils/colors';
 
 export const CompletionLegend: React.FC = () => {
-  const { pageTheme, circlePalette } = useTracker();
-  const palette = PALETTES[circlePalette] || PALETTES.forest;
+  const { circleTone, circlePalette } = useTracker();
+  const palette = resolvePalette(circlePalette, circleTone);
 
   return (
     <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 py-3 text-xs text-stone-500 dark:text-stone-400 select-none">
@@ -14,7 +14,7 @@ export const CompletionLegend: React.FC = () => {
 
       <div className="flex items-center gap-1.5 sm:gap-2">
         {palette.levels.map((level, idx) => {
-          const color = pageTheme === 'dark' ? level.darkColor : level.lightColor;
+          const color = level.color;
 
           return (
             <div

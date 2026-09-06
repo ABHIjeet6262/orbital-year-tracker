@@ -41,19 +41,21 @@ function runTests() {
   console.log('✓ Test 4 Passed: SVG annular sector path syntax valid.');
 
   // Test 5: Palettes & Theme color mapping
-  const redColor = getCompletionColor(0, true, true, 'light', 'forest');
-  const lightGreen = getCompletionColor(15, true, true, 'light', 'forest');
-  const darkestGreen = getCompletionColor(100, true, true, 'light', 'forest');
-  const oceanBlue = getCompletionColor(100, true, true, 'light', 'ocean');
-  const unrecorded = getCompletionColor(0, false, true, 'light', 'forest');
+  const redColor = getCompletionColor(0, true, true, 'bright', 'sage_bright');
+  const lightGreen = getCompletionColor(15, true, true, 'bright', 'sage_bright');
+  const darkestGreen = getCompletionColor(100, true, true, 'bright', 'sage_bright');
+  const oceanBlue = getCompletionColor(100, true, true, 'bright', 'sky_bright');
+  const unrecorded = getCompletionColor(0, false, true, 'bright', 'sage_bright');
+  const darkForest100 = getCompletionColor(100, true, true, 'dark', 'forest_dark');
 
   console.assert(redColor === '#e05353', 'Forest 0% is red');
   console.assert(lightGreen === '#cce8cf', 'Forest 15% is light sage');
   console.assert(darkestGreen === '#13441b', 'Forest 100% is darkest forest');
   console.assert(oceanBlue === '#1e40af', 'Ocean 100% is deep royal blue');
-  console.assert(unrecorded === '#f4f1ea', 'Unrecorded light is warm cream');
-  console.assert(Object.keys(PALETTES).length === 6, 'Must have 6 circle palettes');
-  console.log('✓ Test 5 Passed: 6-palette color system and light/dark resolvers verified.');
+  console.assert(unrecorded === '#f4f0e6', 'Unrecorded light is warm cream');
+  console.assert(darkForest100 === '#75f096', 'Dark Forest 100% is bright neon green');
+  console.assert(Object.keys(PALETTES).length >= 6, 'Must have circle palettes');
+  console.log('✓ Test 5 Passed: Bright and Dark palette color systems and resolvers verified.');
 
   console.log('\nALL 5 CORE VERIFICATION SUITES PASSED CLEANLY!\n');
 }

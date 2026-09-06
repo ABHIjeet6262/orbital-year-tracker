@@ -6,6 +6,7 @@ import type {
   DayCompletionRecord,
   DayProgress,
   PageTheme,
+  CircleTone,
   CirclePalette,
   UserProfile,
   YearStats,
@@ -57,6 +58,9 @@ interface TrackerContextType {
   circlePalette: CirclePalette;
   setCirclePalette: (palette: CirclePalette) => void;
 
+  circleTone: CircleTone;
+  setCircleTone: (tone: CircleTone) => void;
+
   user: UserProfile;
   setUser: (user: UserProfile) => void;
 
@@ -79,7 +83,8 @@ const STORAGE_KEYS = {
   GOALS: 'orbital_goals_v1',
   COMPLETIONS: 'orbital_completions_v1',
   PAGE_THEME: 'orbital_page_theme_v2',
-  CIRCLE_PALETTE: 'orbital_circle_palette_v2',
+  CIRCLE_PALETTE: 'orbital_circle_palette_v3',
+  CIRCLE_TONE: 'orbital_circle_tone_v1',
   USER: 'orbital_user_v1',
 };
 
@@ -117,10 +122,21 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   }, [pageTheme]);
 
+  // Circle Tone: bright (light) / dark
+  const [circleTone, setCircleToneState] = useState<CircleTone>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.CIRCLE_TONE);
+    return saved === 'bright' || saved === 'dark' ? (saved as CircleTone) : 'dark';
+  });
+
+  const setCircleTone = (t: CircleTone) => {
+    setCircleToneState(t);
+    localStorage.setItem(STORAGE_KEYS.CIRCLE_TONE, t);
+  };
+
   // Circle Color Palette
   const [circlePalette, setCirclePaletteState] = useState<CirclePalette>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.CIRCLE_PALETTE);
-    return (saved as CirclePalette) || 'forest';
+    return (saved as CirclePalette) || 'forest_dark';
   });
 
   const setCirclePalette = (p: CirclePalette) => {
@@ -343,7 +359,7 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
         totalHabits: 0,
         completedCount: 0,
         percentage: 0,
-        color: getCompletionColor(0, false, false, pageTheme, circlePalette),
+        color: getCompletionColor(0, false, false, circleTone, circlePalette),
         isToday: false,
         isPast: false,
         isFuture: false,
@@ -374,7 +390,7 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
       totalHabits > 0 ? Math.round((completedCount / totalHabits) * 100) : 0;
     
     const isRecorded = Boolean(record) && (isPast || isToday);
-    const color = getCompletionColor(percentage, isRecorded, true, pageTheme, circlePalette);
+    const color = getCompletionColor(percentage, isRecorded, true, circleTone, circlePalette);
 
     return {
       dateString: dateStr,
@@ -553,6 +569,8 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setPageTheme,
         circlePalette,
         setCirclePalette,
+        circleTone,
+        setCircleTone,
         user,
         setUser,
         filterHabitId,

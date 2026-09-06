@@ -50,7 +50,24 @@ export interface DayProgress {
 
 export type PageTheme = 'light' | 'dark';
 
+export type CircleTone = 'bright' | 'dark';
+
 export type CirclePalette =
+  // Bright palettes
+  | 'sage_bright'
+  | 'mint_bright'
+  | 'sky_bright'
+  | 'amber_bright'
+  | 'rose_bright'
+  | 'slate_bright'
+  // Dark palettes
+  | 'forest_dark'
+  | 'mint_dark'
+  | 'ocean_dark'
+  | 'sunset_dark'
+  | 'amethyst_dark'
+  | 'slate_dark'
+  // Legacy aliases
   | 'forest'
   | 'emerald'
   | 'ocean'

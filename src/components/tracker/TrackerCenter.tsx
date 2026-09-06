@@ -13,7 +13,7 @@ export const TrackerCenter: React.FC<TrackerCenterProps> = ({ cx, cy, radius }) 
     year,
     setYear,
     yearStats,
-    pageTheme,
+    circleTone,
     filterHabitId,
     setFilterHabitId,
     habits,
@@ -21,10 +21,10 @@ export const TrackerCenter: React.FC<TrackerCenterProps> = ({ cx, cy, radius }) 
 
   const filteredHabit = habits.find((h) => h.id === filterHabitId);
 
-  const bgFill = pageTheme === 'dark' ? '#141815' : '#ffffff';
-  const strokeColor = pageTheme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(60, 50, 40, 0.12)';
-  const primaryTextColor = pageTheme === 'dark' ? '#f3f4f6' : '#1c1917';
-  const secondaryTextColor = pageTheme === 'dark' ? '#9ca3af' : '#78716c';
+  const bgFill = circleTone === 'dark' ? '#141815' : '#ffffff';
+  const strokeColor = circleTone === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(60, 50, 40, 0.12)';
+  const primaryTextColor = circleTone === 'dark' ? '#f3f4f6' : '#1c1917';
+  const secondaryTextColor = circleTone === 'dark' ? '#9ca3af' : '#78716c';
 
   return (
     <g className="select-none">

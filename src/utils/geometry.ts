@@ -80,31 +80,32 @@ export function calculateRingMetrics(
   return rings;
 }
 
-// 32 Total sectors:
-// Day 1 starts at top straight line (-90 degrees)
-// Days 1..31 go clockwise: Day 1 (-90° to -78.75°), Day 2, ..., Day 31 (247.5° to 258.75°)
-// Month Column sits between Day 31 and Day 1: from inclined line (258.75° / -101.25°) to straight line (-90°)
+// 32 Total sectors (360° / 32 = 11.25° per sector):
+// Dedicated Month Column is centered at 12 o'clock (-90°), bounded by two symmetrically inclined lines:
+// - Left inclined line at -95.625° (boundary between Day 31 and Month)
+// - Right inclined line at -84.375° (boundary between Month and Day 1)
+// Days 1..31 occupy the remaining 31 sectors clockwise around the circle.
 export const TOTAL_SECTORS = 32;
 export const SECTOR_ANGLE = 360 / TOTAL_SECTORS; // 11.25 degrees
 
 /**
  * Returns angles for the dedicated Month column:
- * Spans from inclined line (-101.25°) to vertical straight line (-90°) at 12 o'clock
+ * Centered at 12 o'clock (-90°), bounded by two inclined radial lines (-95.625° to -84.375°)
  */
 export function getMonthColumnAngles(): { startAngle: number; endAngle: number; midAngle: number } {
-  const startAngle = -90 - SECTOR_ANGLE; // -101.25 degrees (inclined line by 31st)
-  const endAngle = -90;                 // -90 degrees (straight line by 1st)
-  const midAngle = -90 - SECTOR_ANGLE / 2; // -95.625 degrees
+  const midAngle = -90; // Top center 12 o'clock
+  const startAngle = midAngle - SECTOR_ANGLE / 2; // -95.625° (inclined line beside Day 31)
+  const endAngle = midAngle + SECTOR_ANGLE / 2;   // -84.375° (inclined line beside Day 1)
   return { startAngle, endAngle, midAngle };
 }
 
 /**
  * Returns angles for Day 1..31:
- * Day 1 starts at the vertical straight line (-90°) and continues clockwise to Day 31
+ * Day 1 starts at the inclined line beside the Month column (-84.375°) and continues clockwise to Day 31
  */
 export function getDayAngles(dayOfMonth: number): { startAngle: number; endAngle: number; midAngle: number } {
-  const startAngle = -90 + (dayOfMonth - 1) * SECTOR_ANGLE;
-  const endAngle = -90 + dayOfMonth * SECTOR_ANGLE;
+  const startAngle = -90 + SECTOR_ANGLE / 2 + (dayOfMonth - 1) * SECTOR_ANGLE;
+  const endAngle = startAngle + SECTOR_ANGLE;
   const midAngle = startAngle + SECTOR_ANGLE / 2;
 
   return { startAngle, endAngle, midAngle };

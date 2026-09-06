@@ -275,13 +275,13 @@ export const YearTracker: React.FC = () => {
 
         {/* Radial Grid Lines (32 total divisions) */}
         {Array.from({ length: TOTAL_SECTORS }, (_, i) => i).map((sectorIdx) => {
-          // sectorIdx 0 corresponds to -90° (Straight Vertical Line at 12 o'clock between Month and Day 1)
-          const lineAngle = -90 + sectorIdx * SECTOR_ANGLE;
+          // sectorIdx 0 is left boundary of Month column (-95.625°), sectorIdx 1 is right boundary (-84.375°)
+          const lineAngle = monthColumn.startAngle + sectorIdx * SECTOR_ANGLE;
           const pStart = polarToCartesian(CENTER, CENTER, INNER_BOUND_RADIUS, lineAngle);
           const pEnd = polarToCartesian(CENTER, CENTER, OUTER_BOUND_RADIUS, lineAngle);
 
-          // Give distinct crispness to the straight line (at -90°) and the inclined line (at -101.25° / 258.75°)
-          const isMonthBoundary = sectorIdx === 0 || sectorIdx === 31;
+          // Give distinct crispness to both inclined month boundary lines
+          const isMonthBoundary = sectorIdx === 0 || sectorIdx === 1;
 
           return (
             <line

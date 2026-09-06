@@ -24,16 +24,17 @@ function runTests() {
   console.assert(getDaysInMonth(2026, 11) === 31, 'Dec 2026 has 31 days');
   console.log('✓ Test 2 Passed: Month day counts and leap year handling verified.');
 
-  // Test 3: Straight line at Day 1 (-90°) and Inclined line at Day 31 (-101.25° / 258.75°)
+  // Test 3: Both lines beside Month column are inclined (-95.625° and -84.375°)
   const monthCol = getMonthColumnAngles();
   const day1 = getDayAngles(1);
   const day31 = getDayAngles(31);
 
-  console.assert(Math.abs(day1.startAngle - (-90)) < 0.001, 'Day 1 starts at vertical straight line (-90 degrees)');
-  console.assert(Math.abs(monthCol.endAngle - (-90)) < 0.001, 'Month column ends at vertical straight line (-90 degrees)');
-  console.assert(Math.abs(monthCol.startAngle - (-101.25)) < 0.001, 'Month column starts at inclined line (-101.25 degrees)');
-  console.assert(Math.abs(day31.endAngle - 258.75) < 0.001, 'Day 31 ends at inclined line (258.75 = -101.25 + 360)');
-  console.log('✓ Test 3 Passed: Straight line at 1st (-90°) and inclined line at 31st verified.');
+  console.assert(Math.abs(monthCol.midAngle - (-90)) < 0.001, 'Month column is centered at top (12 o clock / -90 degrees)');
+  console.assert(Math.abs(monthCol.startAngle - (-95.625)) < 0.001, 'Left boundary beside Day 31 is inclined line (-95.625 degrees)');
+  console.assert(Math.abs(monthCol.endAngle - (-84.375)) < 0.001, 'Right boundary beside Day 1 is inclined line (-84.375 degrees)');
+  console.assert(Math.abs(day1.startAngle - (-84.375)) < 0.001, 'Day 1 starts at right inclined line (-84.375 degrees)');
+  console.assert(Math.abs(day31.endAngle - 264.375) < 0.001, 'Day 31 ends at left inclined line (264.375 = -95.625 + 360)');
+  console.log('✓ Test 3 Passed: Both lines beside Month cell column are inclined and verified.');
 
   // Test 4: SVG path generation
   const path = createAnnularSectorPath(450, 450, 150, 200, -90, -78.75);

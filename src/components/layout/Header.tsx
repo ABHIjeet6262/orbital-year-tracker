@@ -133,28 +133,8 @@ export const Header: React.FC = () => {
           </button>
         </div>
 
-        {/* Right Tools: Home, Tour, Stats, PWA Install, Light/Dark Theme, User, Settings */}
+        {/* Right Tools: Stats, PWA Install, Light/Dark Theme, User, Settings */}
         <div className="flex items-center gap-1.5 sm:gap-2">
-          {/* Home / Landing Page button */}
-          <button
-            onClick={returnToLanding}
-            className="p-2 text-stone-500 hover:text-stone-900 dark:text-stone-400 dark:hover:text-stone-100 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-xl transition-colors hidden md:flex items-center gap-1.5 text-xs font-medium cursor-pointer"
-            title="Return to Home Showcase"
-          >
-            <Home size={15} />
-            <span>Home</span>
-          </button>
-
-          {/* Interactive Tour Trigger */}
-          <button
-            onClick={startTour}
-            className="p-2 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 rounded-xl transition-colors flex items-center gap-1.5 text-xs font-medium cursor-pointer"
-            title="Interactive Feature Tour"
-          >
-            <Sparkles size={15} />
-            <span className="hidden lg:inline">Tour</span>
-          </button>
-
           {/* PWA Install Button (if available) */}
           {isInstallable && (
             <button

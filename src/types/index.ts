@@ -50,6 +50,8 @@ export interface DayProgress {
 
 export type PageTheme = 'light' | 'dark';
 
+export type ViewMode = 'landing' | 'tracker';
+
 export type CircleTone = 'bright' | 'dark';
 
 export type CirclePalette =

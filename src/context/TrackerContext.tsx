@@ -6,6 +6,7 @@ import type {
   DayCompletionRecord,
   DayProgress,
   PageTheme,
+  ViewMode,
   CircleTone,
   CirclePalette,
   UserProfile,
@@ -52,6 +53,18 @@ interface TrackerContextType {
   setIsDayDrawerOpen: (open: boolean) => void;
   openDayDrawer: (dateStr: string) => void;
 
+  viewMode: ViewMode;
+  setViewMode: (mode: ViewMode) => void;
+  enterTracker: (startTourOption?: boolean) => void;
+  returnToLanding: () => void;
+
+  isTourActive: boolean;
+  tourStep: number;
+  startTour: () => void;
+  nextTourStep: () => void;
+  prevTourStep: () => void;
+  endTour: (withConfetti?: boolean) => void;
+
   pageTheme: PageTheme;
   setPageTheme: (theme: PageTheme) => void;
 
@@ -83,6 +96,8 @@ const STORAGE_KEYS = {
   GOALS: 'orbital_goals_v1',
   COMPLETIONS: 'orbital_completions_v1',
   PAGE_THEME: 'orbital_page_theme_v2',
+  VIEW_MODE: 'orbital_view_mode_v2',
+  HAS_SEEN_TOUR: 'orbital_has_seen_tour_v2',
   CIRCLE_PALETTE: 'orbital_circle_palette_v3',
   CIRCLE_TONE: 'orbital_circle_tone_v1',
   USER: 'orbital_user_v1',
@@ -93,6 +108,71 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [selectedDate, setSelectedDate] = useState<string>(() => getTodayString());
   const [isDayDrawerOpen, setIsDayDrawerOpen] = useState<boolean>(false);
   const [filterHabitId, setFilterHabitId] = useState<string | null>(null);
+
+  // View Mode: 'landing' vs 'tracker'
+  const [viewMode, setViewModeState] = useState<ViewMode>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.VIEW_MODE);
+    return saved === 'tracker' || saved === 'landing' ? (saved as ViewMode) : 'landing';
+  });
+
+  const setViewMode = (mode: ViewMode) => {
+    setViewModeState(mode);
+    localStorage.setItem(STORAGE_KEYS.VIEW_MODE, mode);
+  };
+
+  // Interactive Guided Tour State
+  const [isTourActive, setIsTourActive] = useState<boolean>(false);
+  const [tourStep, setTourStep] = useState<number>(0);
+
+  const startTour = () => {
+    setTourStep(0);
+    setIsTourActive(true);
+  };
+
+  const nextTourStep = () => {
+    if (tourStep < 3) {
+      setTourStep((s) => s + 1);
+    } else {
+      endTour(true);
+    }
+  };
+
+  const prevTourStep = () => {
+    if (tourStep > 0) {
+      setTourStep((s) => s - 1);
+    }
+  };
+
+  const endTour = (withConfetti: boolean = true) => {
+    setIsTourActive(false);
+    localStorage.setItem(STORAGE_KEYS.HAS_SEEN_TOUR, 'true');
+    if (withConfetti) {
+      confetti({
+        particleCount: 80,
+        spread: 80,
+        origin: { y: 0.6 },
+        colors: ['#22c55e', '#10b981', '#3b82f6', '#f59e0b', '#8b5cf6'],
+      });
+    }
+  };
+
+  const enterTracker = (startTourOption: boolean = true) => {
+    setViewMode('tracker');
+    const hasSeenTour = localStorage.getItem(STORAGE_KEYS.HAS_SEEN_TOUR);
+    if (startTourOption && !hasSeenTour) {
+      setTourStep(0);
+      setIsTourActive(true);
+    } else if (startTourOption === true && hasSeenTour) {
+      // If explicitly requested from landing "Take a Tour" button
+      setTourStep(0);
+      setIsTourActive(true);
+    }
+  };
+
+  const returnToLanding = () => {
+    setIsTourActive(false);
+    setViewMode('landing');
+  };
 
   // Page Theme: light / dark
   const [pageTheme, setPageThemeState] = useState<PageTheme>(() => {
@@ -565,6 +645,16 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
         isDayDrawerOpen,
         setIsDayDrawerOpen,
         openDayDrawer,
+        viewMode,
+        setViewMode,
+        enterTracker,
+        returnToLanding,
+        isTourActive,
+        tourStep,
+        startTour,
+        nextTourStep,
+        prevTourStep,
+        endTour,
         pageTheme,
         setPageTheme,
         circlePalette,

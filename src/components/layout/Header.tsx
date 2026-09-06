@@ -13,6 +13,8 @@ import {
   User,
   Printer,
   Smartphone,
+  Home,
+  Sparkles,
 } from 'lucide-react';
 import { AuthModal } from '../auth/AuthModal';
 import { YearlyStatsModal } from '../stats/YearlyStatsModal';
@@ -27,6 +29,8 @@ export const Header: React.FC = () => {
     resetToSampleData,
     exportDataJSON,
     importDataJSON,
+    returnToLanding,
+    startTour,
   } = useTracker();
 
   const { isInstallable, promptInstall } = usePWAInstall();
@@ -87,9 +91,13 @@ export const Header: React.FC = () => {
     <header className="w-full border-b border-stone-200/80 dark:border-stone-800 bg-white/80 dark:bg-stone-900/80 backdrop-blur-md sticky top-0 z-40 transition-colors">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
         {/* Logo & Brand */}
-        <div className="flex items-center gap-3">
+        <button
+          onClick={returnToLanding}
+          className="flex items-center gap-3 text-left group cursor-pointer"
+          title="Return to Home Showcase"
+        >
           {/* Minimal concentric rings SVG logo */}
-          <div className="w-8 h-8 rounded-full border-2 border-emerald-700 dark:border-emerald-400 flex items-center justify-center p-1">
+          <div className="w-8 h-8 rounded-full border-2 border-emerald-700 dark:border-emerald-400 flex items-center justify-center p-1 transition-transform group-hover:scale-105">
             <div className="w-full h-full rounded-full border border-dashed border-emerald-600 dark:border-emerald-300 flex items-center justify-center">
               <div className="w-1.5 h-1.5 rounded-full bg-emerald-700 dark:bg-emerald-400" />
             </div>
@@ -102,7 +110,7 @@ export const Header: React.FC = () => {
               </span>
             </h1>
           </div>
-        </div>
+        </button>
 
         {/* Year Navigator (Center) */}
         <div className="flex items-center gap-1 sm:gap-2 bg-stone-100/80 dark:bg-stone-800/80 px-2 py-1 rounded-full border border-stone-200/50 dark:border-stone-700/50 shadow-2xs">
@@ -125,8 +133,28 @@ export const Header: React.FC = () => {
           </button>
         </div>
 
-        {/* Right Tools: Stats, PWA Install, Light/Dark Theme, User, Settings */}
+        {/* Right Tools: Home, Tour, Stats, PWA Install, Light/Dark Theme, User, Settings */}
         <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* Home / Landing Page button */}
+          <button
+            onClick={returnToLanding}
+            className="p-2 text-stone-500 hover:text-stone-900 dark:text-stone-400 dark:hover:text-stone-100 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-xl transition-colors hidden md:flex items-center gap-1.5 text-xs font-medium cursor-pointer"
+            title="Return to Home Showcase"
+          >
+            <Home size={15} />
+            <span>Home</span>
+          </button>
+
+          {/* Interactive Tour Trigger */}
+          <button
+            onClick={startTour}
+            className="p-2 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 rounded-xl transition-colors flex items-center gap-1.5 text-xs font-medium cursor-pointer"
+            title="Interactive Feature Tour"
+          >
+            <Sparkles size={15} />
+            <span className="hidden lg:inline">Tour</span>
+          </button>
+
           {/* PWA Install Button (if available) */}
           {isInstallable && (
             <button
@@ -203,6 +231,25 @@ export const Header: React.FC = () => {
                   onClick={() => setShowSettingsMenu(false)}
                 />
                 <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl shadow-xl py-1.5 z-30 text-xs animate-in zoom-in-95 duration-100">
+                  <button
+                    onClick={() => {
+                      startTour();
+                      setShowSettingsMenu(false);
+                    }}
+                    className="w-full text-left px-3.5 py-2 flex items-center gap-2 hover:bg-stone-50 dark:hover:bg-stone-700 text-emerald-700 dark:text-emerald-300 font-medium cursor-pointer"
+                  >
+                    <Sparkles size={14} /> Start Guided Tour
+                  </button>
+                  <button
+                    onClick={() => {
+                      returnToLanding();
+                      setShowSettingsMenu(false);
+                    }}
+                    className="w-full text-left px-3.5 py-2 flex items-center gap-2 hover:bg-stone-50 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-200 cursor-pointer"
+                  >
+                    <Home size={14} /> Return to Home Page
+                  </button>
+                  <div className="my-1 border-t border-stone-100 dark:border-stone-700" />
                   {isInstallable && (
                     <button
                       onClick={() => {

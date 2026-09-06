@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" rx="100" fill="#faf8f5"/>
+  <!-- Concentric Rings -->
+  <circle cx="256" cy="256" r="210" fill="none" stroke="#e05353" stroke-width="14" stroke-dasharray="24 6"/>
+  <circle cx="256" cy="256" r="185" fill="none" stroke="#cce8cf" stroke-width="14"/>
+  <circle cx="256" cy="256" r="160" fill="none" stroke="#9ecda4" stroke-width="14"/>
+  <circle cx="256" cy="256" r="135" fill="none" stroke="#63aa6e" stroke-width="14"/>
+  <circle cx="256" cy="256" r="110" fill="none" stroke="#388544" stroke-width="14"/>
+  <circle cx="256" cy="256" r="85" fill="none" stroke="#22632c" stroke-width="14"/>
+  <circle cx="256" cy="256" r="60" fill="none" stroke="#13441b" stroke-width="14"/>
+  <!-- Center Core -->
+  <circle cx="256" cy="256" r="36" fill="#13441b"/>
+  <circle cx="256" cy="256" r="12" fill="#faf8f5"/>
+</svg>

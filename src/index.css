@@ -1,0 +1,109 @@
+@import "tailwindcss";
+
+@variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  :root {
+    --bg-page: #faf8f5;
+    --bg-surface: #ffffff;
+    --bg-surface-subtle: #f4f1ea;
+    --bg-surface-elevated: #ffffff;
+    --border-main: #e8e4db;
+    --border-subtle: #f0ece3;
+    --text-primary: #1c1917;
+    --text-secondary: #57534e;
+    --text-muted: #a8a29e;
+    --accent-forest: #1b4332;
+    --accent-forest-hover: #143326;
+    --accent-emerald: #22c55e;
+    --accent-red: #e05353;
+  }
+
+  .dark {
+    --bg-page: #0f1210;
+    --bg-surface: #171b18;
+    --bg-surface-subtle: #1f2521;
+    --bg-surface-elevated: #232a25;
+    --border-main: #2b352e;
+    --border-subtle: #1f2722;
+    --text-primary: #f5f5f4;
+    --text-secondary: #a8a29e;
+    --text-muted: #78716c;
+    --accent-forest: #3fa35e;
+    --accent-forest-hover: #4ece77;
+    --accent-emerald: #4cd474;
+    --accent-red: #ef4444;
+  }
+
+  .forest {
+    --bg-page: #0b1712;
+    --bg-surface: #10211a;
+    --bg-surface-subtle: #152b22;
+    --bg-surface-elevated: #1a362b;
+    --border-main: #234738;
+    --border-subtle: #1b372b;
+    --text-primary: #f1f7f4;
+    --text-secondary: #99beae;
+    --text-muted: #5e8f7a;
+    --accent-forest: #4d8f6e;
+    --accent-forest-hover: #63b28b;
+    --accent-emerald: #80e2b3;
+    --accent-red: #f87171;
+  }
+
+  body {
+    background-color: var(--bg-page);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    transition: background-color 0.25s ease, color 0.25s ease;
+    overflow-x: hidden;
+  }
+}
+
+/* Custom minimal scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(120, 113, 108, 0.2);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(120, 113, 108, 0.4);
+}
+
+/* Animations */
+@keyframes pulse-subtle {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  50% {
+    transform: scale(1.06);
+    opacity: 1;
+  }
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 2.5s infinite ease-in-out;
+}
+
+/* Printable layout styling */
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+}

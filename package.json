@@ -1,13 +1,50 @@
 {
-  "name": "yearly-tracker",
+  "name": "orbital-year-tracker",
+  "productName": "Orbital Year Tracker",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
+  "description": "Minimal circular habit and annual goal tracker desktop application.",
+  "main": "electron/main.cjs",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "electron:dev": "concurrently -k \"cross-env BROWSER=none vite\" \"wait-on tcp:5173 && cross-env NODE_ENV=development VITE_DEV_SERVER_URL=http://localhost:5173 electron .\"",
+    "electron:preview": "npm run build && electron .",
+    "electron:dist": "npm run build && electron-builder"
+  },
+  "electronBuilder": {
+    "appId": "com.orbital.yeartracker",
+    "productName": "Orbital Year Tracker",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.productivity"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Utility"
+    }
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.115.0",
@@ -26,9 +63,14 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "@vitejs/plugin-react": "^6.1.0",
+    "concurrently": "^10.0.5",
+    "cross-env": "^10.1.0",
+    "electron": "^44.2.0",
+    "electron-builder": "^26.15.3",
     "oxlint": "^1.79.0",
     "typescript": "~6.0.2",
     "vite": "^8.2.2",
-    "vite-plugin-pwa": "^1.3.0"
+    "vite-plugin-pwa": "^1.3.0",
+    "wait-on": "^9.1.0"
   }
 }

@@ -1,32 +1,56 @@
-# React + TypeScript + Vite
+# ⭕ Orbital Year Tracker
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+> **See your entire year in one circle.** A minimal, physical journal-inspired yearly habit and annual goal tracking application built for offline productivity.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## 🖥️ Desktop Application (100% Offline)
 
-## React Compiler
+Orbital Year Tracker is fully equipped to run as a **native standalone desktop application** on Windows, macOS, and Linux with zero external internet dependencies.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+### 1. Run Desktop App in Development
+Starts the local development server and launches the native Electron desktop window:
+```bash
+npm run electron:dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+### 2. Preview Offline Desktop App (Production Bundle)
+Compiles production assets and runs them locally inside Electron using the local file protocol:
+```bash
+npm run electron:preview
+```
+
+### 3. Build Standalone Desktop Installer (`.exe` / macOS / Linux)
+Generates standalone executables (NSIS installer & portable `.exe` on Windows, `.dmg` on macOS, `.AppImage` on Linux) in the `release/` directory:
+```bash
+npm run electron:dist
+```
+
+---
+
+## 🌐 Instant Desktop PWA (Progressive Web App)
+
+You can also run Orbital Year Tracker as a desktop application directly from your browser without packaging:
+1. Open the app in **Google Chrome**, **Microsoft Edge**, or **Brave**.
+2. Click the **"Install App"** button in the top right header, or click the install icon in your browser's address bar.
+3. The app will install to your Start Menu / Desktop / Dock and open in its own clean, frameless desktop window with offline service-worker caching.
+
+---
+
+## 🛠️ Web Development & Scripts
+
+| Command | Description |
+|---|---|
+| `npm run dev` | Launch local Vite development server (`http://localhost:5173`) |
+| `npm run build` | Typecheck with `tsc` and create optimized offline web/desktop bundle in `dist/` |
+| `npm run preview` | Preview production build on a local static server |
+| `npx tsx src/utils/geometry.test.ts` | Run geometric validation test suites (concentric rings, 32 sectors, incline geometry) |
+
+---
+
+## 🛡️ Privacy & Offline Architecture
+
+- **100% Local-First**: All habits, goals, notes, and completions are stored directly in your device's browser `localStorage`.
+- **Zero Telemetry**: Operates completely offline without mandatory accounts or logins.
+- **Optional Cloud Backup**: Optional one-click sync with Supabase for cross-device access if signed in.
+- **Data Portability**: Full JSON export and schema-validated import at any time with PII scrubbing.

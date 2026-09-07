@@ -41,6 +41,7 @@ export const Header: React.FC = () => {
   } = useTracker();
 
   const { isInstallable, promptInstall } = usePWAInstall();
+  const isElectron = typeof window !== 'undefined' && Boolean(window.electronAPI?.isElectron);
 
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isStatsOpen, setIsStatsOpen] = useState(false);
@@ -149,18 +150,28 @@ export const Header: React.FC = () => {
           </button>
         </div>
 
-        {/* Right Tools: Stats, PWA Install, Light/Dark Theme, User, Settings */}
+        {/* Right Tools: Stats, PWA Install / Desktop Badge, Light/Dark Theme, User, Settings */}
         <div className="flex items-center gap-1.5 sm:gap-2">
-          {/* PWA Install Button (if available) */}
-          {isInstallable && (
-            <button
-              onClick={promptInstall}
-              className="px-2.5 py-1.5 rounded-xl border border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100 transition-colors flex items-center gap-1.5 text-xs font-medium cursor-pointer animate-in fade-in"
-              title="Install App to Home Screen"
+          {/* Desktop App Badge or PWA Install Button */}
+          {isElectron ? (
+            <div
+              className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 text-[11px] font-medium text-emerald-800 dark:text-emerald-300 shadow-2xs"
+              title="Running in Standalone Desktop Application"
             >
-              <Smartphone size={14} />
-              <span className="hidden md:inline">Install App</span>
-            </button>
+              <Smartphone size={13} />
+              <span>Desktop App</span>
+            </div>
+          ) : (
+            isInstallable && (
+              <button
+                onClick={promptInstall}
+                className="px-2.5 py-1.5 rounded-xl border border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100 transition-colors flex items-center gap-1.5 text-xs font-medium cursor-pointer animate-in fade-in"
+                title="Install App to Home Screen / Desktop"
+              >
+                <Smartphone size={14} />
+                <span className="hidden md:inline">Install App</span>
+              </button>
+            )
           )}
 
           {/* Stats Button */}

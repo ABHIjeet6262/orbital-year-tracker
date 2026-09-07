@@ -101,6 +101,25 @@ export const YearTracker: React.FC = () => {
     setIsDragging(false);
   };
 
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      setIsDragging(true);
+      setDragStart({ x: e.touches[0].clientX - pan.x, y: e.touches[0].clientY - pan.y });
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isDragging || e.touches.length !== 1) return;
+    setPan({
+      x: e.touches[0].clientX - dragStart.x,
+      y: e.touches[0].clientY - dragStart.y,
+    });
+  };
+
+  const handleTouchEnd = () => {
+    setIsDragging(false);
+  };
+
   const handleZoomIn = () => setZoom((z) => Math.min(2.5, z + 0.2));
   const handleZoomOut = () => setZoom((z) => Math.max(0.7, z - 0.2));
   const handleResetView = () => {
@@ -115,11 +134,15 @@ export const YearTracker: React.FC = () => {
   return (
     <div
       ref={containerRef}
-      className="relative w-full aspect-square max-w-[680px] lg:max-w-[740px] xl:max-w-[800px] mx-auto flex items-center justify-center select-none"
+      className="relative w-full aspect-square max-w-[680px] lg:max-w-[740px] xl:max-w-[800px] mx-auto flex items-center justify-center select-none touch-none"
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchEnd}
     >
       {/* Zoom / Pan / Circle Theme Controls */}
       <div className="absolute top-2 right-2 sm:top-4 sm:right-4 z-20 flex flex-col gap-1.5 bg-white/90 dark:bg-stone-900/90 backdrop-blur-md p-1.5 rounded-xl border border-stone-200 dark:border-stone-800 shadow-md">
@@ -163,7 +186,7 @@ export const YearTracker: React.FC = () => {
                 className="fixed inset-0 z-30"
                 onClick={() => setShowPaletteMenu(false)}
               />
-              <div className="absolute right-full mr-2 top-0 w-56 bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-2xl shadow-2xl p-2.5 z-40 animate-in zoom-in-95 duration-100">
+              <div className="absolute right-0 sm:right-full sm:mr-2 top-full sm:top-0 mt-2 sm:mt-0 w-56 bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-2xl shadow-2xl p-2.5 z-40 animate-in zoom-in-95 duration-100">
                 <div className="flex items-center justify-between pb-1.5 mb-2 border-b border-stone-100 dark:border-stone-800">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">
                     Circle Theme

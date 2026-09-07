@@ -101,15 +101,18 @@ export const DayDetailDrawer: React.FC = () => {
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
+      className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
       onClick={() => setIsDayDrawerOpen(false)}
     >
       <div
-        className="w-full max-w-md bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150 my-auto"
+        className="w-full max-w-md bg-white dark:bg-stone-900 border-t sm:border border-stone-200 dark:border-stone-800 rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-5 sm:zoom-in-95 duration-200 max-h-[88vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Mobile Pull / Grab Indicator */}
+        <div className="w-10 h-1 rounded-full bg-stone-300 dark:bg-stone-700 mx-auto mt-2.5 mb-1 sm:hidden shrink-0" />
+
         {/* Header with Date Navigation */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-stone-100 dark:border-stone-800 bg-stone-50/50 dark:bg-stone-900/50">
+        <div className="flex items-center justify-between px-5 py-3 sm:py-4 border-b border-stone-100 dark:border-stone-800 bg-stone-50/50 dark:bg-stone-900/50 shrink-0">
           <div className="flex items-center gap-2">
             <button
               onClick={handlePrevDay}

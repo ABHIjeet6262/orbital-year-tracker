@@ -50,6 +50,13 @@ export const LandingPage: React.FC = () => {
     habitsCompleted: number;
     pos: { x: number; y: number };
   } | null>(null);
+  const [selectedDay, setSelectedDay] = useState<{
+    dateStr: string;
+    monthIndex: number;
+    dayNum: number;
+    pct: number;
+    habitsCompleted: number;
+  } | null>(null);
 
   // Live Interactive Demo Habits for Today
   const [demoHabits, setDemoHabits] = useState([
@@ -190,7 +197,16 @@ export const LandingPage: React.FC = () => {
     };
   };
 
-  const handleCellClick = (e: React.MouseEvent) => {
+  const handleCellClick = (e: React.MouseEvent, progress?: DayProgress) => {
+    if (progress && progress.isValidDay) {
+      setSelectedDay({
+        dateStr: progress.dateString,
+        monthIndex: progress.monthIndex,
+        dayNum: progress.dayOfMonth,
+        pct: progress.percentage,
+        habitsCompleted: progress.completedCount,
+      });
+    }
     confetti({
       particleCount: 35,
       spread: 45,
@@ -295,6 +311,26 @@ export const LandingPage: React.FC = () => {
               <Compass size={17} className="text-emerald-700 dark:text-emerald-400" />
               <span>Direct to Workspace</span>
             </button>
+          </div>
+
+          {/* Mobile Metric Badges Strip (visible on mobile where floating badges are hidden) */}
+          <div className="flex sm:hidden items-center justify-center gap-1.5 flex-wrap mb-4 w-full px-2">
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/90 dark:bg-stone-900/90 border border-stone-200/80 dark:border-stone-800 text-[11px] font-medium text-stone-800 dark:text-stone-200 shadow-2xs">
+              <Layers size={12} className="text-emerald-600 dark:text-emerald-400" />
+              <span>12 Rings</span>
+            </div>
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/90 dark:bg-stone-900/90 border border-stone-200/80 dark:border-stone-800 text-[11px] font-medium text-stone-800 dark:text-stone-200 shadow-2xs">
+              <Sparkles size={12} className="text-amber-500" />
+              <span>13 Perfect</span>
+            </div>
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/90 dark:bg-stone-900/90 border border-stone-200/80 dark:border-stone-800 text-[11px] font-medium text-stone-800 dark:text-stone-200 shadow-2xs">
+              <Flame size={12} className="text-rose-500" />
+              <span>24d Streak</span>
+            </div>
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/90 dark:bg-stone-900/90 border border-stone-200/80 dark:border-stone-800 text-[11px] font-medium text-stone-800 dark:text-stone-200 shadow-2xs">
+              <ShieldCheck size={12} className="text-blue-500" />
+              <span>100% Offline</span>
+            </div>
           </div>
 
           {/* 3. LIVE INTERACTIVE ORBIT CANVAS */}
@@ -494,7 +530,7 @@ export const LandingPage: React.FC = () => {
                             })
                           }
                           onMouseLeave={() => setHoveredDay(null)}
-                          onClick={(e) => handleCellClick(e)}
+                          onClick={(e) => handleCellClick(e, progress)}
                         >
                           <path
                             d={pathData}
@@ -565,10 +601,10 @@ export const LandingPage: React.FC = () => {
               </text>
             </svg>
 
-            {/* Hover Tooltip on Hero */}
+            {/* Hover Tooltip on Hero (Desktop) */}
             {hoveredDay && (
               <div
-                className="fixed z-50 pointer-events-none px-3 py-2 rounded-xl bg-stone-900/95 dark:bg-stone-950/95 backdrop-blur-md text-white text-xs shadow-2xl border border-stone-800 animate-in fade-in duration-100"
+                className="hidden sm:block fixed z-50 pointer-events-none px-3 py-2 rounded-xl bg-stone-900/95 dark:bg-stone-950/95 backdrop-blur-md text-white text-xs shadow-2xl border border-stone-800 animate-in fade-in duration-100"
                 style={{
                   left: hoveredDay.pos.x + 12,
                   top: hoveredDay.pos.y - 45,
@@ -588,6 +624,27 @@ export const LandingPage: React.FC = () => {
             )}
           </div>
 
+          {/* Mobile Tapped Day Inspector Card */}
+          {selectedDay && (
+            <div className="flex sm:hidden w-full max-w-sm mt-3 px-3.5 py-2.5 rounded-2xl bg-stone-900/95 dark:bg-stone-950/95 backdrop-blur-md border border-stone-800 text-white shadow-xl items-center justify-between animate-in fade-in slide-in-from-bottom-2 duration-200">
+              <div className="text-left">
+                <div className="font-serif font-medium text-xs text-stone-100 flex items-center gap-1.5">
+                  <span>{MONTH_SHORT_NAMES[selectedDay.monthIndex]} {selectedDay.dayNum}, {currentYear}</span>
+                  {selectedDay.pct === 100 && <Sparkles size={11} className="text-amber-400" />}
+                </div>
+                <div className="text-[11px] text-emerald-400 font-medium mt-0.5">
+                  {selectedDay.pct}% complete • {selectedDay.habitsCompleted}/4 habits
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedDay(null)}
+                className="px-2 py-1 rounded-lg text-xs text-stone-400 hover:text-white bg-stone-800/80 cursor-pointer"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
+
           {/* 4. LIVE INTERACTIVE THEME & DEMO BAR */}
           <div className="w-full max-w-xl mx-auto mt-6 p-4 sm:p-5 rounded-3xl bg-white/80 dark:bg-stone-900/80 backdrop-blur-md border border-stone-200/80 dark:border-stone-800 shadow-xl flex flex-col gap-4">
             {/* Palette Switcher */}
@@ -597,7 +654,7 @@ export const LandingPage: React.FC = () => {
                 <span>Live Orbit Palette:</span>
               </div>
 
-              <div className="flex items-center gap-1.5 flex-wrap">
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full scrollbar-none">
                 {DEMO_PALETTES.map((pal) => {
                   const isSelected = activePalette === pal.id;
                   return (
@@ -607,14 +664,14 @@ export const LandingPage: React.FC = () => {
                         setActivePalette(pal.id);
                         setActiveTone(pal.tone);
                       }}
-                      className={`px-2.5 py-1 rounded-xl text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
+                      className={`shrink-0 px-2.5 py-1 rounded-xl text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
                         isSelected
                           ? 'bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-900 shadow-xs'
                           : 'bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-300 hover:bg-stone-200 dark:hover:bg-stone-700'
                       }`}
                     >
                       <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: pal.color }} />
-                      <span className="hidden sm:inline">{pal.name}</span>
+                      <span>{pal.name}</span>
                     </button>
                   );
                 })}

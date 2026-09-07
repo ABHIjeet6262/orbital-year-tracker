@@ -34,6 +34,11 @@ import type { CircleTone, CirclePalette, DayProgress } from '../../types';
 export const LandingPage: React.FC = () => {
   const { enterTracker, pageTheme, setPageTheme } = useTracker();
 
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth();
+  const currentDay = now.getDate();
+
   // Landing Page Interactive State
   const [activeTone, setActiveTone] = useState<CircleTone>('dark');
   const [activePalette, setActivePalette] = useState<CirclePalette>('forest_dark');
@@ -46,7 +51,7 @@ export const LandingPage: React.FC = () => {
     pos: { x: number; y: number };
   } | null>(null);
 
-  // Live Interactive Demo Habits for Today (Sep 6)
+  // Live Interactive Demo Habits for Today
   const [demoHabits, setDemoHabits] = useState([
     { id: '1', name: 'Morning Meditation', icon: '🧘', done: true },
     { id: '2', name: '5km Run / Workout', icon: '🏃', done: true },
@@ -89,11 +94,6 @@ export const LandingPage: React.FC = () => {
 
   // Generate realistic sample completion pattern for the landing hero
   const getDemoDayProgress = (mIndex: number, dayNum: number): DayProgress => {
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth();
-    const currentDay = now.getDate();
-
     const daysInM = getDaysInMonth(currentYear, mIndex);
     const isValid = dayNum <= daysInM;
     const dateStr = formatDateString(currentYear, mIndex, dayNum);
@@ -550,7 +550,7 @@ export const LandingPage: React.FC = () => {
                 letterSpacing="0.1em"
                 fill={activeTone === 'dark' ? '#f3f4f6' : '#1c1917'}
               >
-                2026
+                {currentYear}
               </text>
               <text
                 x={CENTER}
@@ -575,7 +575,7 @@ export const LandingPage: React.FC = () => {
                 }}
               >
                 <div className="font-serif font-medium text-sm text-stone-100 flex items-center gap-1.5">
-                  <span>{MONTH_SHORT_NAMES[hoveredDay.monthIndex]} {hoveredDay.dayNum}, 2026</span>
+                  <span>{MONTH_SHORT_NAMES[hoveredDay.monthIndex]} {hoveredDay.dayNum}, {currentYear}</span>
                   {hoveredDay.pct === 100 && <Sparkles size={12} className="text-amber-400" />}
                 </div>
                 <div className="text-[11px] text-emerald-400 font-medium mt-0.5">
@@ -625,7 +625,7 @@ export const LandingPage: React.FC = () => {
             <div className="text-left">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-medium text-stone-700 dark:text-stone-300">
-                  Try ticking habits for Today (Sep 6) to watch the orbit react live:
+                  Try ticking habits for Today ({MONTH_SHORT_NAMES[currentMonth]} {currentDay}) to watch the orbit react live:
                 </span>
                 <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400">
                   {todayPct}%
@@ -733,7 +733,7 @@ export const LandingPage: React.FC = () => {
             <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-64 h-64 rounded-full border border-emerald-700/40 pointer-events-none" />
             
             <h2 className="font-serif text-3xl sm:text-4xl font-semibold mb-4 text-emerald-50">
-              Start your 2026 orbit today.
+              Start your {currentYear} orbit today.
             </h2>
             <p className="text-emerald-200/90 text-sm sm:text-base max-w-lg mx-auto mb-8 font-light">
               Experience the focus and peace of seeing all 365 days united in a single, harmonious circular calendar.
@@ -753,7 +753,7 @@ export const LandingPage: React.FC = () => {
       <footer className="w-full border-t border-stone-200 dark:border-stone-800 py-6 text-center text-xs text-stone-500 dark:text-stone-400">
         <div className="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div>
-            <span>Orbital Year Tracker © 2026 • Minimal Physical Planner Digital Edition</span>
+            <span>Orbital Year Tracker © {currentYear} • Minimal Physical Planner Digital Edition</span>
           </div>
           <div className="flex items-center gap-4">
             <button

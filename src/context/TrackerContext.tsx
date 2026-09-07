@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import confetti from 'canvas-confetti';
 import type {
   Habit,
@@ -10,6 +10,7 @@ import type {
   CircleTone,
   CirclePalette,
   UserProfile,
+  SyncStatus,
   YearStats,
 } from '../types';
 import {
@@ -26,26 +27,42 @@ import {
   parseDateString,
 } from '../utils/dateUtils';
 import { getCompletionColor } from '../utils/colors';
+import {
+  supabase,
+  isSupabaseConfigured,
+  fetchUserData,
+  syncHabitToCloud,
+  deleteHabitFromCloud,
+  syncGoalToCloud,
+  deleteGoalFromCloud,
+  syncCompletionToCloud,
+  uploadLocalDataToCloud,
+  mapRowToHabit,
+  mapRowToGoal,
+  type CloudHabitRow,
+  type CloudGoalRow,
+  type CloudCompletionRow,
+} from '../lib/supabase';
 
 interface TrackerContextType {
   year: number;
   setYear: (year: number) => void;
   habits: Habit[];
   activeHabits: Habit[];
-  addHabit: (habit: Omit<Habit, 'id' | 'createdAt'>) => void;
-  updateHabit: (id: string, updates: Partial<Habit>) => void;
-  deleteHabit: (id: string) => void;
+  addHabit: (habit: Omit<Habit, 'id' | 'createdAt'>) => Promise<void>;
+  updateHabit: (id: string, updates: Partial<Habit>) => Promise<void>;
+  deleteHabit: (id: string) => Promise<void>;
   reorderHabits: (habits: Habit[]) => void;
   
   goals: Goal[];
-  addGoal: (goal: Omit<Goal, 'id' | 'createdAt'>) => void;
-  updateGoal: (id: string, updates: Partial<Goal>) => void;
-  deleteGoal: (id: string) => void;
-  incrementGoal: (id: string, delta: number) => void;
+  addGoal: (goal: Omit<Goal, 'id' | 'createdAt'>) => Promise<void>;
+  updateGoal: (id: string, updates: Partial<Goal>) => Promise<void>;
+  deleteGoal: (id: string) => Promise<void>;
+  incrementGoal: (id: string, delta: number) => Promise<void>;
 
   completions: Record<string, DayCompletionRecord>;
-  toggleHabitCompletion: (dateStr: string, habitId: string) => void;
-  updateDayNote: (dateStr: string, note: string, mood?: DayCompletionRecord['mood']) => void;
+  toggleHabitCompletion: (dateStr: string, habitId: string) => Promise<void>;
+  updateDayNote: (dateStr: string, note: string, mood?: DayCompletionRecord['mood']) => Promise<void>;
 
   selectedDate: string;
   setSelectedDate: (date: string) => void;
@@ -76,6 +93,9 @@ interface TrackerContextType {
 
   user: UserProfile;
   setUser: (user: UserProfile) => void;
+  syncStatus: SyncStatus;
+  isCloudConnected: boolean;
+  syncLocalToCloud: () => Promise<boolean>;
 
   filterHabitId: string | null;
   setFilterHabitId: (id: string | null) => void;
@@ -108,6 +128,7 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [selectedDate, setSelectedDate] = useState<string>(() => getTodayString());
   const [isDayDrawerOpen, setIsDayDrawerOpen] = useState<boolean>(false);
   const [filterHabitId, setFilterHabitId] = useState<string | null>(null);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>('guest');
 
   // View Mode: 'landing' vs 'tracker'
   const [viewMode, setViewModeState] = useState<ViewMode>(() => {
@@ -163,7 +184,6 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setTourStep(0);
       setIsTourActive(true);
     } else if (startTourOption === true && hasSeenTour) {
-      // If explicitly requested from landing "Take a Tour" button
       setTourStep(0);
       setIsTourActive(true);
     }
@@ -240,6 +260,7 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const setUser = (u: UserProfile) => {
     setUserState(u);
     localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(u));
+    setSyncStatus(u.isGuest ? 'guest' : 'synced');
   };
 
   // Habits
@@ -269,7 +290,7 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return generateSampleCompletions(2026);
   });
 
-  // Save to localStorage
+  // Local storage persistence
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.HABITS, JSON.stringify(habits));
   }, [habits]);
@@ -282,23 +303,214 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
     localStorage.setItem(STORAGE_KEYS.COMPLETIONS, JSON.stringify(completions));
   }, [completions]);
 
+  // Load cloud data for logged-in users
+  const loadCloudUserData = useCallback(async (userId: string) => {
+    setSyncStatus('syncing');
+    try {
+      const cloudData = await fetchUserData(userId);
+      if (cloudData) {
+        if (cloudData.habits && cloudData.habits.length > 0) {
+          setHabits(cloudData.habits);
+        }
+        if (cloudData.goals && cloudData.goals.length > 0) {
+          setGoals(cloudData.goals);
+        }
+        if (cloudData.completions && Object.keys(cloudData.completions).length > 0) {
+          setCompletions(cloudData.completions);
+        }
+        if (cloudData.profile?.circle_palette) {
+          setCirclePaletteState(cloudData.profile.circle_palette);
+        }
+        if (cloudData.profile?.circle_tone) {
+          setCircleToneState(cloudData.profile.circle_tone);
+        }
+      }
+      setSyncStatus('synced');
+    } catch (err) {
+      console.error('Failed to load cloud data:', err);
+      setSyncStatus('offline');
+    }
+  }, []);
+
+  // Supabase Auth & Realtime Subscriptions
+  useEffect(() => {
+    if (!supabase || !isSupabaseConfigured) {
+      setSyncStatus('guest');
+      return;
+    }
+
+    // 1. Initial Session Check
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        const u: UserProfile = {
+          id: session.user.id,
+          name: session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'User',
+          email: session.user.email,
+          isGuest: false,
+        };
+        setUserState(u);
+        localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(u));
+        loadCloudUserData(session.user.id);
+      } else {
+        setSyncStatus('guest');
+      }
+    });
+
+    // 2. Auth State Listener
+    const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (session?.user) {
+          const u: UserProfile = {
+            id: session.user.id,
+            name: session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'User',
+            email: session.user.email,
+            isGuest: false,
+          };
+          setUserState(u);
+          localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(u));
+          loadCloudUserData(session.user.id);
+        } else if (event === 'SIGNED_OUT') {
+          const guest: UserProfile = {
+            id: 'guest-1',
+            name: 'Guest Traveler',
+            isGuest: true,
+          };
+          setUserState(guest);
+          localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(guest));
+          setSyncStatus('guest');
+        }
+      }
+    );
+
+    // 3. Realtime Postgres Changes Subscription
+    let realtimeChannel: ReturnType<typeof supabase.channel> | null = null;
+    if (user && !user.isGuest) {
+      realtimeChannel = supabase
+        .channel(`realtime:orbital-${user.id}`)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'habits', filter: `user_id=eq.${user.id}` },
+          (payload) => {
+            if (payload.eventType === 'INSERT') {
+              const newH = mapRowToHabit(payload.new as CloudHabitRow);
+              setHabits((prev) => (prev.some((h) => h.id === newH.id) ? prev : [...prev, newH]));
+            } else if (payload.eventType === 'UPDATE') {
+              const updatedH = mapRowToHabit(payload.new as CloudHabitRow);
+              setHabits((prev) => prev.map((h) => (h.id === updatedH.id ? updatedH : h)));
+            } else if (payload.eventType === 'DELETE') {
+              const oldId = (payload.old as { id: string }).id;
+              setHabits((prev) => prev.filter((h) => h.id !== oldId));
+            }
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'goals', filter: `user_id=eq.${user.id}` },
+          (payload) => {
+            if (payload.eventType === 'INSERT') {
+              const newG = mapRowToGoal(payload.new as CloudGoalRow);
+              setGoals((prev) => (prev.some((g) => g.id === newG.id) ? prev : [...prev, newG]));
+            } else if (payload.eventType === 'UPDATE') {
+              const updatedG = mapRowToGoal(payload.new as CloudGoalRow);
+              setGoals((prev) => prev.map((g) => (g.id === updatedG.id ? updatedG : g)));
+            } else if (payload.eventType === 'DELETE') {
+              const oldId = (payload.old as { id: string }).id;
+              setGoals((prev) => prev.filter((g) => g.id !== oldId));
+            }
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'completions', filter: `user_id=eq.${user.id}` },
+          (payload) => {
+            if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+              const row = payload.new as CloudCompletionRow;
+              setCompletions((prev) => ({
+                ...prev,
+                [row.date]: {
+                  date: row.date,
+                  completedHabitIds: Array.isArray(row.completed_habit_ids) ? row.completed_habit_ids : [],
+                  note: row.note || undefined,
+                  mood: (row.mood as DayCompletionRecord['mood']) || undefined,
+                },
+              }));
+            }
+          }
+        )
+        .subscribe();
+    }
+
+    return () => {
+      authSubscription.unsubscribe();
+      if (realtimeChannel) {
+        realtimeChannel.unsubscribe();
+      }
+    };
+  }, [user.id, user.isGuest, loadCloudUserData]);
+
+  // Sync Local Data to Cloud
+  const syncLocalToCloud = async (): Promise<boolean> => {
+    if (user.isGuest || !isSupabaseConfigured) return false;
+    setSyncStatus('syncing');
+    try {
+      await uploadLocalDataToCloud(user.id, habits, goals, completions);
+      setSyncStatus('synced');
+      return true;
+    } catch (err) {
+      console.error('Error syncing local data to cloud:', err);
+      setSyncStatus('offline');
+      return false;
+    }
+  };
+
   const activeHabits = useMemo(() => habits.filter((h) => !h.archived), [habits]);
 
   // Habit Actions
-  const addHabit = (newHabitData: Omit<Habit, 'id' | 'createdAt'>) => {
+  const addHabit = async (newHabitData: Omit<Habit, 'id' | 'createdAt'>) => {
     const newHabit: Habit = {
       ...newHabitData,
       id: `habit-${Date.now()}`,
       createdAt: new Date().toISOString(),
     };
     setHabits((prev) => [...prev, newHabit]);
+
+    if (!user.isGuest && isSupabaseConfigured) {
+      setSyncStatus('syncing');
+      try {
+        await syncHabitToCloud(user.id, newHabit);
+        setSyncStatus('synced');
+      } catch (e) {
+        console.error('Sync habit error:', e);
+        setSyncStatus('offline');
+      }
+    }
   };
 
-  const updateHabit = (id: string, updates: Partial<Habit>) => {
-    setHabits((prev) => prev.map((h) => (h.id === id ? { ...h, ...updates } : h)));
+  const updateHabit = async (id: string, updates: Partial<Habit>) => {
+    let updatedHabit: Habit | undefined;
+    setHabits((prev) =>
+      prev.map((h) => {
+        if (h.id === id) {
+          updatedHabit = { ...h, ...updates };
+          return updatedHabit;
+        }
+        return h;
+      })
+    );
+
+    if (!user.isGuest && isSupabaseConfigured && updatedHabit) {
+      setSyncStatus('syncing');
+      try {
+        await syncHabitToCloud(user.id, updatedHabit);
+        setSyncStatus('synced');
+      } catch (e) {
+        console.error('Sync habit error:', e);
+        setSyncStatus('offline');
+      }
+    }
   };
 
-  const deleteHabit = (id: string) => {
+  const deleteHabit = async (id: string) => {
     setHabits((prev) => prev.filter((h) => h.id !== id));
     setCompletions((prev) => {
       const next = { ...prev };
@@ -312,6 +524,17 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
       return next;
     });
+
+    if (!user.isGuest && isSupabaseConfigured) {
+      setSyncStatus('syncing');
+      try {
+        await deleteHabitFromCloud(user.id, id);
+        setSyncStatus('synced');
+      } catch (e) {
+        console.error('Delete habit error:', e);
+        setSyncStatus('offline');
+      }
+    }
   };
 
   const reorderHabits = (reordered: Habit[]) => {
@@ -319,16 +542,28 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   // Goal Actions
-  const addGoal = (goalData: Omit<Goal, 'id' | 'createdAt'>) => {
+  const addGoal = async (goalData: Omit<Goal, 'id' | 'createdAt'>) => {
     const newGoal: Goal = {
       ...goalData,
       id: `goal-${Date.now()}`,
       createdAt: new Date().toISOString(),
     };
     setGoals((prev) => [...prev, newGoal]);
+
+    if (!user.isGuest && isSupabaseConfigured) {
+      setSyncStatus('syncing');
+      try {
+        await syncGoalToCloud(user.id, newGoal);
+        setSyncStatus('synced');
+      } catch (e) {
+        console.error('Sync goal error:', e);
+        setSyncStatus('offline');
+      }
+    }
   };
 
-  const updateGoal = (id: string, updates: Partial<Goal>) => {
+  const updateGoal = async (id: string, updates: Partial<Goal>) => {
+    let updatedGoal: Goal | undefined;
     setGoals((prev) =>
       prev.map((g) => {
         if (g.id !== id) return g;
@@ -336,16 +571,40 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
         if (updated.currentValue >= updated.targetValue) {
           updated.completed = true;
         }
+        updatedGoal = updated;
         return updated;
       })
     );
+
+    if (!user.isGuest && isSupabaseConfigured && updatedGoal) {
+      setSyncStatus('syncing');
+      try {
+        await syncGoalToCloud(user.id, updatedGoal);
+        setSyncStatus('synced');
+      } catch (e) {
+        console.error('Sync goal error:', e);
+        setSyncStatus('offline');
+      }
+    }
   };
 
-  const deleteGoal = (id: string) => {
+  const deleteGoal = async (id: string) => {
     setGoals((prev) => prev.filter((g) => g.id !== id));
+
+    if (!user.isGuest && isSupabaseConfigured) {
+      setSyncStatus('syncing');
+      try {
+        await deleteGoalFromCloud(user.id, id);
+        setSyncStatus('synced');
+      } catch (e) {
+        console.error('Delete goal error:', e);
+        setSyncStatus('offline');
+      }
+    }
   };
 
-  const incrementGoal = (id: string, delta: number) => {
+  const incrementGoal = async (id: string, delta: number) => {
+    let updatedGoal: Goal | undefined;
     setGoals((prev) =>
       prev.map((g) => {
         if (g.id !== id) return g;
@@ -359,23 +618,43 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
             colors: ['#22c55e', '#16a34a', '#86efac'],
           });
         }
-        return {
+        updatedGoal = {
           ...g,
           currentValue: nextVal,
           completed: isCompleted,
         };
+        return updatedGoal;
       })
     );
+
+    if (!user.isGuest && isSupabaseConfigured && updatedGoal) {
+      setSyncStatus('syncing');
+      try {
+        await syncGoalToCloud(user.id, updatedGoal);
+        setSyncStatus('synced');
+      } catch (e) {
+        console.error('Sync goal error:', e);
+        setSyncStatus('offline');
+      }
+    }
   };
 
   // Completion Actions
-  const toggleHabitCompletion = (dateStr: string, habitId: string) => {
+  const toggleHabitCompletion = async (dateStr: string, habitId: string) => {
+    let updatedCompletedIds: string[] = [];
+    let currentNote: string | undefined;
+    let currentMood: DayCompletionRecord['mood'] | undefined;
+
     setCompletions((prev) => {
       const existing = prev[dateStr] || { date: dateStr, completedHabitIds: [] };
       const isCompleted = existing.completedHabitIds.includes(habitId);
       const newCompletedIds = isCompleted
         ? existing.completedHabitIds.filter((id) => id !== habitId)
         : [...existing.completedHabitIds, habitId];
+
+      updatedCompletedIds = newCompletedIds;
+      currentNote = existing.note;
+      currentMood = existing.mood;
 
       if (!isCompleted && newCompletedIds.length === activeHabits.length && activeHabits.length > 0) {
         confetti({
@@ -394,15 +673,29 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
         },
       };
     });
+
+    if (!user.isGuest && isSupabaseConfigured) {
+      setSyncStatus('syncing');
+      try {
+        await syncCompletionToCloud(user.id, dateStr, updatedCompletedIds, currentNote, currentMood);
+        setSyncStatus('synced');
+      } catch (e) {
+        console.error('Sync completion error:', e);
+        setSyncStatus('offline');
+      }
+    }
   };
 
-  const updateDayNote = (
+  const updateDayNote = async (
     dateStr: string,
     note: string,
     mood?: DayCompletionRecord['mood']
   ) => {
+    let completedIds: string[] = [];
+
     setCompletions((prev) => {
       const existing = prev[dateStr] || { date: dateStr, completedHabitIds: [] };
+      completedIds = existing.completedHabitIds;
       return {
         ...prev,
         [dateStr]: {
@@ -412,6 +705,17 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
         },
       };
     });
+
+    if (!user.isGuest && isSupabaseConfigured) {
+      setSyncStatus('syncing');
+      try {
+        await syncCompletionToCloud(user.id, dateStr, completedIds, note, mood);
+        setSyncStatus('synced');
+      } catch (e) {
+        console.error('Sync day note error:', e);
+        setSyncStatus('offline');
+      }
+    }
   };
 
   const openDayDrawer = (dateStr: string) => {
@@ -663,6 +967,9 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setCircleTone,
         user,
         setUser,
+        syncStatus,
+        isCloudConnected: isSupabaseConfigured,
+        syncLocalToCloud,
         filterHabitId,
         setFilterHabitId,
         getDayProgress,

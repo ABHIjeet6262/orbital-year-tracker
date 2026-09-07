@@ -15,6 +15,9 @@ import {
   Smartphone,
   Home,
   Sparkles,
+  Cloud,
+  CloudOff,
+  RefreshCw,
 } from 'lucide-react';
 import { AuthModal } from '../auth/AuthModal';
 import { YearlyStatsModal } from '../stats/YearlyStatsModal';
@@ -26,6 +29,7 @@ export const Header: React.FC = () => {
     pageTheme,
     setPageTheme,
     user,
+    syncStatus,
     resetToSampleData,
     exportDataJSON,
     importDataJSON,
@@ -183,15 +187,35 @@ export const Header: React.FC = () => {
             </button>
           </div>
 
-          {/* User / Guest Badge */}
+          {/* User / Cloud Sync Badge */}
           <button
             onClick={() => setIsAuthOpen(true)}
             className="px-2.5 py-1.5 rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-800/60 hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-200 transition-colors flex items-center gap-1.5 text-xs cursor-pointer"
+            title={
+              user.isGuest
+                ? 'Guest Mode (Click to Sign In & Cloud Sync)'
+                : syncStatus === 'syncing'
+                ? 'Syncing with Supabase Cloud...'
+                : syncStatus === 'synced'
+                ? 'Cloud Synced with Supabase'
+                : 'Offline Cached'
+            }
           >
-            <User size={13} className="text-emerald-600 dark:text-emerald-400" />
+            {user.isGuest ? (
+              <User size={13} className="text-stone-500 dark:text-stone-400" />
+            ) : syncStatus === 'syncing' ? (
+              <RefreshCw size={13} className="text-amber-500 animate-spin" />
+            ) : syncStatus === 'synced' ? (
+              <Cloud size={13} className="text-emerald-600 dark:text-emerald-400" />
+            ) : (
+              <CloudOff size={13} className="text-amber-500" />
+            )}
             <span className="hidden sm:inline font-medium truncate max-w-[90px]">
               {user.isGuest ? 'Guest' : user.name}
             </span>
+            {!user.isGuest && syncStatus === 'synced' && (
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse hidden sm:inline-block" />
+            )}
           </button>
 
           {/* Data Menu / Export */}

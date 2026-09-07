@@ -84,6 +84,8 @@ export interface UserProfile {
   isGuest: boolean;
 }
 
+export type SyncStatus = 'synced' | 'syncing' | 'offline' | 'guest';
+
 export interface YearStats {
   totalDays: number;
   recordedDays: number;

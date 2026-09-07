@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { AuthModal } from '../auth/AuthModal';
 import { YearlyStatsModal } from '../stats/YearlyStatsModal';
+import { InstallAppModal } from '../common/InstallAppModal';
 
 export const Header: React.FC = () => {
   const {
@@ -45,6 +46,7 @@ export const Header: React.FC = () => {
 
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isStatsOpen, setIsStatsOpen] = useState(false);
+  const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
@@ -162,16 +164,20 @@ export const Header: React.FC = () => {
               <span>Desktop App</span>
             </div>
           ) : (
-            isInstallable && (
-              <button
-                onClick={promptInstall}
-                className="px-2.5 py-1.5 rounded-xl border border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100 transition-colors flex items-center gap-1.5 text-xs font-medium cursor-pointer animate-in fade-in"
-                title="Install App to Home Screen / Desktop"
-              >
-                <Smartphone size={14} />
-                <span className="hidden md:inline">Install App</span>
-              </button>
-            )
+            <button
+              onClick={() => {
+                if (isInstallable) {
+                  promptInstall();
+                } else {
+                  setIsInstallModalOpen(true);
+                }
+              }}
+              className="px-2.5 py-1.5 rounded-xl border border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition-colors flex items-center gap-1.5 text-xs font-medium cursor-pointer"
+              title="Install App to Desktop / Home Screen"
+            >
+              <Smartphone size={14} />
+              <span className="hidden md:inline">Install App</span>
+            </button>
           )}
 
           {/* Stats Button */}
@@ -277,15 +283,19 @@ export const Header: React.FC = () => {
                     <Home size={14} /> Return to Home Page
                   </button>
                   <div className="my-1 border-t border-stone-100 dark:border-stone-700" />
-                  {isInstallable && (
+                  {!isElectron && (
                     <button
                       onClick={() => {
-                        promptInstall();
                         setShowSettingsMenu(false);
+                        if (isInstallable) {
+                          promptInstall();
+                        } else {
+                          setIsInstallModalOpen(true);
+                        }
                       }}
                       className="w-full text-left px-3.5 py-2 flex items-center gap-2 hover:bg-stone-50 dark:hover:bg-stone-700 text-emerald-700 dark:text-emerald-300 font-medium cursor-pointer"
                     >
-                      <Smartphone size={14} /> Install Offline App
+                      <Smartphone size={14} /> Install Desktop App
                     </button>
                   )}
                   <button
@@ -384,6 +394,12 @@ export const Header: React.FC = () => {
       {/* Modals */}
       <AuthModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} />
       <YearlyStatsModal isOpen={isStatsOpen} onClose={() => setIsStatsOpen(false)} />
+      <InstallAppModal
+        isOpen={isInstallModalOpen}
+        onClose={() => setIsInstallModalOpen(false)}
+        onTriggerInstall={promptInstall}
+        canDirectInstall={isInstallable}
+      />
     </header>
   );
 };

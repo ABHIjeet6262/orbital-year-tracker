@@ -294,7 +294,7 @@ export function getCompletionColor(
     }
   }
 
-  return levels[6].color;
+  return levels[levels.length - 1].color;
 }
 
 export function getGridBorderColor(circleTone: CircleTone = 'dark'): string {

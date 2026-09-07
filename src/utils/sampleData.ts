@@ -143,14 +143,17 @@ export const INITIAL_GOALS: Goal[] = [
 ];
 
 /**
- * Generates realistic sample completion data up to today (Sep 5, 2026)
+ * Generates realistic sample completion data up to the current date dynamically
  */
-export function generateSampleCompletions(year: number = 2026): Record<string, DayCompletionRecord> {
+export function generateSampleCompletions(year?: number): Record<string, DayCompletionRecord> {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const targetYear = year ?? currentYear;
+  const currentMonth = now.getMonth();
+  const currentDay = now.getDate();
+
   const records: Record<string, DayCompletionRecord> = {};
   const habitIds = INITIAL_HABITS.map((h) => h.id);
-
-  const currentMonth = 8; // September
-  const currentDay = 5;
 
   const sampleNotes = [
     'Great morning session, solved two hard graph problems.',
@@ -164,15 +167,18 @@ export function generateSampleCompletions(year: number = 2026): Record<string, D
   ];
 
   for (let m = 0; m < 12; m++) {
-    const daysInMonth = getDaysInMonth(year, m);
+    const daysInMonth = getDaysInMonth(targetYear, m);
 
     for (let d = 1; d <= daysInMonth; d++) {
-      if (m > currentMonth || (m === currentMonth && d > currentDay)) {
+      if (targetYear > currentYear) {
+        continue;
+      }
+      if (targetYear === currentYear && (m > currentMonth || (m === currentMonth && d > currentDay))) {
         continue;
       }
 
-      const dateStr = formatDateString(year, m, d);
-      const seed = (m * 31 + d * 17 + year * 7) % 100;
+      const dateStr = formatDateString(targetYear, m, d);
+      const seed = (m * 31 + d * 17 + targetYear * 7) % 100;
 
       let completedCount: number;
       if (seed < 8) {
@@ -191,7 +197,7 @@ export function generateSampleCompletions(year: number = 2026): Record<string, D
         completedCount = 8;
       }
 
-      if (m === currentMonth && d === currentDay) {
+      if (targetYear === currentYear && m === currentMonth && d === currentDay) {
         completedCount = 6;
       }
 

@@ -12,6 +12,7 @@ import type {
   UserProfile,
   SyncStatus,
   YearStats,
+  Frequency,
 } from '../types';
 import {
   INITIAL_HABITS,
@@ -32,6 +33,7 @@ import {
   isSupabaseConfigured,
   fetchUserData,
   syncHabitToCloud,
+  syncHabitsBatchToCloud,
   deleteHabitFromCloud,
   syncGoalToCloud,
   deleteGoalFromCloud,
@@ -39,6 +41,7 @@ import {
   uploadLocalDataToCloud,
   mapRowToHabit,
   mapRowToGoal,
+  generateUniqueId,
   type CloudHabitRow,
   type CloudGoalRow,
   type CloudCompletionRow,
@@ -52,7 +55,7 @@ interface TrackerContextType {
   addHabit: (habit: Omit<Habit, 'id' | 'createdAt'>) => Promise<void>;
   updateHabit: (id: string, updates: Partial<Habit>) => Promise<void>;
   deleteHabit: (id: string) => Promise<void>;
-  reorderHabits: (habits: Habit[]) => void;
+  reorderHabits: (habits: Habit[]) => Promise<void>;
   
   goals: Goal[];
   addGoal: (goal: Omit<Goal, 'id' | 'createdAt'>) => Promise<void>;
@@ -124,7 +127,8 @@ const STORAGE_KEYS = {
 };
 
 export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [year, setYear] = useState<number>(2026);
+  // Default year dynamically to current calendar year
+  const [year, setYear] = useState<number>(() => new Date().getFullYear());
   const [selectedDate, setSelectedDate] = useState<string>(() => getTodayString());
   const [isDayDrawerOpen, setIsDayDrawerOpen] = useState<boolean>(false);
   const [filterHabitId, setFilterHabitId] = useState<string | null>(null);
@@ -177,13 +181,10 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
-  const enterTracker = (startTourOption: boolean = true) => {
+  const enterTracker = (startTourOption: boolean = false) => {
     setViewMode('tracker');
     const hasSeenTour = localStorage.getItem(STORAGE_KEYS.HAS_SEEN_TOUR);
     if (startTourOption && !hasSeenTour) {
-      setTourStep(0);
-      setIsTourActive(true);
-    } else if (startTourOption === true && hasSeenTour) {
       setTourStep(0);
       setIsTourActive(true);
     }
@@ -222,7 +223,7 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   }, [pageTheme]);
 
-  // Circle Tone: bright (light) / dark
+  // Circle Tone: bright / dark
   const [circleTone, setCircleToneState] = useState<CircleTone>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.CIRCLE_TONE);
     return saved === 'bright' || saved === 'dark' ? (saved as CircleTone) : 'dark';
@@ -287,7 +288,7 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (saved) {
       try { return JSON.parse(saved); } catch {}
     }
-    return generateSampleCompletions(2026);
+    return generateSampleCompletions(new Date().getFullYear());
   });
 
   // Local storage persistence
@@ -339,8 +340,13 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
       return;
     }
 
-    // 1. Initial Session Check
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    // 1. Initial Session Check with safe catch handler
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (error) {
+        console.warn('Initial auth session error:', error.message);
+        setSyncStatus('guest');
+        return;
+      }
       if (session?.user) {
         const u: UserProfile = {
           id: session.user.id,
@@ -354,12 +360,15 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
       } else {
         setSyncStatus('guest');
       }
+    }).catch((err) => {
+      console.warn('Failed to retrieve auth session:', err);
+      setSyncStatus('guest');
     });
 
-    // 2. Auth State Listener
+    // 2. Auth State Listener — only re-fetch cloud data on true sign-in
     const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        if (session?.user) {
+        if (event === 'SIGNED_IN' && session?.user) {
           const u: UserProfile = {
             id: session.user.id,
             name: session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'User',
@@ -370,6 +379,7 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
           localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(u));
           loadCloudUserData(session.user.id);
         } else if (event === 'SIGNED_OUT') {
+          // Reset state to initial templates and purge localStorage for privacy
           const guest: UserProfile = {
             id: 'guest-1',
             name: 'Guest Traveler',
@@ -377,6 +387,16 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
           };
           setUserState(guest);
           localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(guest));
+          
+          setHabits(INITIAL_HABITS);
+          setGoals(INITIAL_GOALS);
+          const freshCompletions = generateSampleCompletions(new Date().getFullYear());
+          setCompletions(freshCompletions);
+
+          localStorage.removeItem(STORAGE_KEYS.HABITS);
+          localStorage.removeItem(STORAGE_KEYS.GOALS);
+          localStorage.removeItem(STORAGE_KEYS.COMPLETIONS);
+
           setSyncStatus('guest');
         }
       }
@@ -465,13 +485,17 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const activeHabits = useMemo(() => habits.filter((h) => !h.archived), [habits]);
 
-  // Habit Actions
+  // ==============================================================================
+  // HABIT ACTIONS (Resolved React 19 State Concurrency)
+  // ==============================================================================
+
   const addHabit = async (newHabitData: Omit<Habit, 'id' | 'createdAt'>) => {
     const newHabit: Habit = {
       ...newHabitData,
-      id: `habit-${Date.now()}`,
+      id: generateUniqueId('habit'),
       createdAt: new Date().toISOString(),
     };
+
     setHabits((prev) => [...prev, newHabit]);
 
     if (!user.isGuest && isSupabaseConfigured) {
@@ -487,21 +511,17 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const updateHabit = async (id: string, updates: Partial<Habit>) => {
-    let updatedHabit: Habit | undefined;
-    setHabits((prev) =>
-      prev.map((h) => {
-        if (h.id === id) {
-          updatedHabit = { ...h, ...updates };
-          return updatedHabit;
-        }
-        return h;
-      })
-    );
+    const existing = habits.find((h) => h.id === id);
+    if (!existing) return;
 
-    if (!user.isGuest && isSupabaseConfigured && updatedHabit) {
+    const mergedHabit: Habit = { ...existing, ...updates };
+
+    setHabits((prev) => prev.map((h) => (h.id === id ? mergedHabit : h)));
+
+    if (!user.isGuest && isSupabaseConfigured) {
       setSyncStatus('syncing');
       try {
-        await syncHabitToCloud(user.id, updatedHabit);
+        await syncHabitToCloud(user.id, mergedHabit);
         setSyncStatus('synced');
       } catch (e) {
         console.error('Sync habit error:', e);
@@ -511,6 +531,11 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const deleteHabit = async (id: string) => {
+    // Clear filter if deleting active filtered habit
+    if (filterHabitId === id) {
+      setFilterHabitId(null);
+    }
+
     setHabits((prev) => prev.filter((h) => h.id !== id));
     setCompletions((prev) => {
       const next = { ...prev };
@@ -537,15 +562,28 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
-  const reorderHabits = (reordered: Habit[]) => {
+  const reorderHabits = async (reordered: Habit[]) => {
     setHabits(reordered);
+    if (!user.isGuest && isSupabaseConfigured) {
+      setSyncStatus('syncing');
+      try {
+        await syncHabitsBatchToCloud(user.id, reordered);
+        setSyncStatus('synced');
+      } catch (e) {
+        console.error('Reorder habits sync error:', e);
+        setSyncStatus('offline');
+      }
+    }
   };
 
-  // Goal Actions
+  // ==============================================================================
+  // GOAL ACTIONS (Resolved React 19 State Concurrency)
+  // ==============================================================================
+
   const addGoal = async (goalData: Omit<Goal, 'id' | 'createdAt'>) => {
     const newGoal: Goal = {
       ...goalData,
-      id: `goal-${Date.now()}`,
+      id: generateUniqueId('goal'),
       createdAt: new Date().toISOString(),
     };
     setGoals((prev) => [...prev, newGoal]);
@@ -563,23 +601,20 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const updateGoal = async (id: string, updates: Partial<Goal>) => {
-    let updatedGoal: Goal | undefined;
-    setGoals((prev) =>
-      prev.map((g) => {
-        if (g.id !== id) return g;
-        const updated = { ...g, ...updates };
-        if (updated.currentValue >= updated.targetValue) {
-          updated.completed = true;
-        }
-        updatedGoal = updated;
-        return updated;
-      })
-    );
+    const existing = goals.find((g) => g.id === id);
+    if (!existing) return;
 
-    if (!user.isGuest && isSupabaseConfigured && updatedGoal) {
+    const mergedGoal: Goal = { ...existing, ...updates };
+    if (mergedGoal.currentValue >= mergedGoal.targetValue) {
+      mergedGoal.completed = true;
+    }
+
+    setGoals((prev) => prev.map((g) => (g.id === id ? mergedGoal : g)));
+
+    if (!user.isGuest && isSupabaseConfigured) {
       setSyncStatus('syncing');
       try {
-        await syncGoalToCloud(user.id, updatedGoal);
+        await syncGoalToCloud(user.id, mergedGoal);
         setSyncStatus('synced');
       } catch (e) {
         console.error('Sync goal error:', e);
@@ -604,30 +639,30 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const incrementGoal = async (id: string, delta: number) => {
-    let updatedGoal: Goal | undefined;
-    setGoals((prev) =>
-      prev.map((g) => {
-        if (g.id !== id) return g;
-        const nextVal = Math.max(0, g.currentValue + delta);
-        const isCompleted = nextVal >= g.targetValue;
-        if (isCompleted && !g.completed) {
-          confetti({
-            particleCount: 50,
-            spread: 60,
-            origin: { y: 0.6 },
-            colors: ['#22c55e', '#16a34a', '#86efac'],
-          });
-        }
-        updatedGoal = {
-          ...g,
-          currentValue: nextVal,
-          completed: isCompleted,
-        };
-        return updatedGoal;
-      })
-    );
+    const existing = goals.find((g) => g.id === id);
+    if (!existing) return;
 
-    if (!user.isGuest && isSupabaseConfigured && updatedGoal) {
+    const nextVal = Math.max(0, existing.currentValue + delta);
+    const isCompleted = nextVal >= existing.targetValue;
+    
+    if (isCompleted && !existing.completed) {
+      confetti({
+        particleCount: 50,
+        spread: 60,
+        origin: { y: 0.6 },
+        colors: ['#22c55e', '#16a34a', '#86efac'],
+      });
+    }
+
+    const updatedGoal: Goal = {
+      ...existing,
+      currentValue: nextVal,
+      completed: isCompleted,
+    };
+
+    setGoals((prev) => prev.map((g) => (g.id === id ? updatedGoal : g)));
+
+    if (!user.isGuest && isSupabaseConfigured) {
       setSyncStatus('syncing');
       try {
         await syncGoalToCloud(user.id, updatedGoal);
@@ -639,45 +674,46 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
-  // Completion Actions
+  // ==============================================================================
+  // COMPLETION ACTIONS (Resolved React 19 State Concurrency)
+  // ==============================================================================
+
   const toggleHabitCompletion = async (dateStr: string, habitId: string) => {
-    let updatedCompletedIds: string[] = [];
-    let currentNote: string | undefined;
-    let currentMood: DayCompletionRecord['mood'] | undefined;
+    const existing = completions[dateStr] || { date: dateStr, completedHabitIds: [] };
+    const isCompleted = existing.completedHabitIds.includes(habitId);
+    const newCompletedIds = isCompleted
+      ? existing.completedHabitIds.filter((id) => id !== habitId)
+      : [...existing.completedHabitIds, habitId];
 
-    setCompletions((prev) => {
-      const existing = prev[dateStr] || { date: dateStr, completedHabitIds: [] };
-      const isCompleted = existing.completedHabitIds.includes(habitId);
-      const newCompletedIds = isCompleted
-        ? existing.completedHabitIds.filter((id) => id !== habitId)
-        : [...existing.completedHabitIds, habitId];
+    if (!isCompleted && newCompletedIds.length === activeHabits.length && activeHabits.length > 0) {
+      confetti({
+        particleCount: 60,
+        spread: 70,
+        origin: { y: 0.7 },
+        colors: ['#14532d', '#22c55e', '#4ade80', '#86efac'],
+      });
+    }
 
-      updatedCompletedIds = newCompletedIds;
-      currentNote = existing.note;
-      currentMood = existing.mood;
+    const updatedRecord: DayCompletionRecord = {
+      ...existing,
+      completedHabitIds: newCompletedIds,
+    };
 
-      if (!isCompleted && newCompletedIds.length === activeHabits.length && activeHabits.length > 0) {
-        confetti({
-          particleCount: 60,
-          spread: 70,
-          origin: { y: 0.7 },
-          colors: ['#14532d', '#22c55e', '#4ade80', '#86efac'],
-        });
-      }
-
-      return {
-        ...prev,
-        [dateStr]: {
-          ...existing,
-          completedHabitIds: newCompletedIds,
-        },
-      };
-    });
+    setCompletions((prev) => ({
+      ...prev,
+      [dateStr]: updatedRecord,
+    }));
 
     if (!user.isGuest && isSupabaseConfigured) {
       setSyncStatus('syncing');
       try {
-        await syncCompletionToCloud(user.id, dateStr, updatedCompletedIds, currentNote, currentMood);
+        await syncCompletionToCloud(
+          user.id,
+          dateStr,
+          newCompletedIds,
+          existing.note,
+          existing.mood
+        );
         setSyncStatus('synced');
       } catch (e) {
         console.error('Sync completion error:', e);
@@ -691,25 +727,22 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
     note: string,
     mood?: DayCompletionRecord['mood']
   ) => {
-    let completedIds: string[] = [];
+    const existing = completions[dateStr] || { date: dateStr, completedHabitIds: [] };
+    const updatedRecord: DayCompletionRecord = {
+      ...existing,
+      note,
+      ...(mood ? { mood } : {}),
+    };
 
-    setCompletions((prev) => {
-      const existing = prev[dateStr] || { date: dateStr, completedHabitIds: [] };
-      completedIds = existing.completedHabitIds;
-      return {
-        ...prev,
-        [dateStr]: {
-          ...existing,
-          note,
-          ...(mood ? { mood } : {}),
-        },
-      };
-    });
+    setCompletions((prev) => ({
+      ...prev,
+      [dateStr]: updatedRecord,
+    }));
 
     if (!user.isGuest && isSupabaseConfigured) {
       setSyncStatus('syncing');
       try {
-        await syncCompletionToCloud(user.id, dateStr, completedIds, note, mood);
+        await syncCompletionToCloud(user.id, dateStr, existing.completedHabitIds, note, mood);
         setSyncStatus('synced');
       } catch (e) {
         console.error('Sync day note error:', e);
@@ -798,7 +831,7 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return getDayProgressByIndices(yr, monthIndex, day);
   };
 
-  // Year Stats
+  // Year Stats with defensive iteration cap
   const yearStats = useMemo<YearStats>(() => {
     let totalDays = 0;
     let recordedDays = 0;
@@ -851,7 +884,11 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     if (isCurrentYear) {
       let checkDate = new Date();
-      while (true) {
+      let iterations = 0;
+      const maxIterations = 366; // Maximum days in a leap year
+
+      while (iterations < maxIterations) {
+        iterations++;
         const dStr = formatDateString(
           checkDate.getFullYear(),
           checkDate.getMonth(),
@@ -894,11 +931,15 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
     localStorage.setItem(STORAGE_KEYS.COMPLETIONS, JSON.stringify(newCompletions));
   };
 
+  // Export data with PII scrubbed
   const exportDataJSON = () => {
     const exportData = {
       version: 1,
       exportDate: new Date().toISOString(),
-      user,
+      user: {
+        name: user.name,
+        isGuest: true,
+      },
       habits,
       goals,
       completions,
@@ -906,21 +947,112 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return JSON.stringify(exportData, null, 2);
   };
 
+  // Strict Schema Validation for JSON import
   const importDataJSON = (jsonString: string): boolean => {
     try {
+      if (!jsonString || typeof jsonString !== 'string') return false;
       const data = JSON.parse(jsonString);
+      if (!data || typeof data !== 'object') return false;
+
+      let validHabits: Habit[] | null = null;
+      let validGoals: Goal[] | null = null;
+      let validCompletions: Record<string, DayCompletionRecord> | null = null;
+
+      // 1. Validate Habits
       if (data.habits && Array.isArray(data.habits)) {
-        setHabits(data.habits);
+        const parsed: Habit[] = [];
+        for (const item of data.habits) {
+          if (
+            typeof item === 'object' &&
+            item !== null &&
+            typeof item.id === 'string' &&
+            typeof item.name === 'string' &&
+            item.name.trim().length > 0 &&
+            ['daily', 'weekdays', 'weekends'].includes(item.frequency)
+          ) {
+            parsed.push({
+              id: item.id.slice(0, 128),
+              name: item.name.trim().slice(0, 100),
+              description: typeof item.description === 'string' ? item.description.slice(0, 300) : undefined,
+              frequency: item.frequency as Frequency,
+              category: typeof item.category === 'string' ? item.category.slice(0, 50) : undefined,
+              color: typeof item.color === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(item.color) ? item.color : undefined,
+              startDate: typeof item.startDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(item.startDate) ? item.startDate : getTodayString(),
+              archived: Boolean(item.archived),
+              createdAt: typeof item.createdAt === 'string' ? item.createdAt : new Date().toISOString(),
+            });
+          }
+        }
+        if (parsed.length > 0) {
+          validHabits = parsed;
+        }
       }
+
+      // 2. Validate Goals
       if (data.goals && Array.isArray(data.goals)) {
-        setGoals(data.goals);
+        const parsed: Goal[] = [];
+        for (const item of data.goals) {
+          if (
+            typeof item === 'object' &&
+            item !== null &&
+            typeof item.id === 'string' &&
+            typeof item.title === 'string' &&
+            item.title.trim().length > 0 &&
+            typeof item.currentValue === 'number' &&
+            typeof item.targetValue === 'number' &&
+            !isNaN(item.currentValue) &&
+            !isNaN(item.targetValue)
+          ) {
+            parsed.push({
+              id: item.id.slice(0, 128),
+              title: item.title.trim().slice(0, 100),
+              description: typeof item.description === 'string' ? item.description.slice(0, 300) : undefined,
+              category: typeof item.category === 'string' ? item.category.slice(0, 50) : undefined,
+              currentValue: Math.max(0, item.currentValue),
+              targetValue: Math.max(1, item.targetValue),
+              unit: typeof item.unit === 'string' ? item.unit.slice(0, 20) : undefined,
+              deadline: typeof item.deadline === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(item.deadline) ? item.deadline : undefined,
+              completed: Boolean(item.completed),
+              createdAt: typeof item.createdAt === 'string' ? item.createdAt : new Date().toISOString(),
+            });
+          }
+        }
+        if (parsed.length > 0) {
+          validGoals = parsed;
+        }
       }
-      if (data.completions && typeof data.completions === 'object') {
-        setCompletions(data.completions);
+
+      // 3. Validate Completions
+      if (data.completions && typeof data.completions === 'object' && !Array.isArray(data.completions)) {
+        const parsed: Record<string, DayCompletionRecord> = {};
+        for (const [dateKey, val] of Object.entries(data.completions)) {
+          if (
+            /^\d{4}-\d{2}-\d{2}$/.test(dateKey) &&
+            typeof val === 'object' &&
+            val !== null &&
+            Array.isArray((val as any).completedHabitIds)
+          ) {
+            const raw = val as any;
+            const validIds = raw.completedHabitIds.filter((id: any) => typeof id === 'string' && id.length < 128);
+            parsed[dateKey] = {
+              date: dateKey,
+              completedHabitIds: validIds,
+              note: typeof raw.note === 'string' ? raw.note.slice(0, 500) : undefined,
+              mood: ['great', 'good', 'neutral', 'tired', 'bad'].includes(raw.mood) ? raw.mood : undefined,
+            };
+          }
+        }
+        validCompletions = parsed;
       }
-      return true;
+
+      // Apply valid records to state
+      if (validHabits) setHabits(validHabits);
+      if (validGoals) setGoals(validGoals);
+      if (validCompletions) setCompletions(validCompletions);
+
+      return Boolean(validHabits || validGoals || validCompletions);
     } catch (e) {
-      console.error('Import error:', e);
+      console.error('Import schema validation error:', e);
       return false;
     }
   };

@@ -56,7 +56,7 @@ export const DayDetailDrawer: React.FC = () => {
 
   if (!isDayDrawerOpen) return null;
 
-  // Day navigation helpers
+  // Day navigation helpers with defensive year boundary protection
   const handlePrevDay = () => {
     const { year, monthIndex, day } = parseDateString(selectedDate);
     let newYear = year;
@@ -69,6 +69,7 @@ export const DayDetailDrawer: React.FC = () => {
         newMonth = 11;
         newYear--;
       }
+      if (newYear < 2000) return; // Boundary guard
       newDay = getDaysInMonth(newYear, newMonth);
     }
     setSelectedDate(formatDateString(newYear, newMonth, newDay));
@@ -88,6 +89,7 @@ export const DayDetailDrawer: React.FC = () => {
         newMonth = 0;
         newYear++;
       }
+      if (newYear > 2100) return; // Boundary guard
     }
     setSelectedDate(formatDateString(newYear, newMonth, newDay));
   };

@@ -21,20 +21,48 @@ export const supabase: SupabaseClient | null = isSupabaseConfigured
     })
   : null;
 
+/**
+ * Generates collision-resistant unique IDs using native crypto.randomUUID()
+ */
+export function generateUniqueId(prefix: string = 'id'): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return `${prefix}-${crypto.randomUUID()}`;
+  }
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
 // ==============================================================================
 // AUTH HELPERS
 // ==============================================================================
 
 export async function getCurrentSession() {
   if (!supabase) return null;
-  const { data } = await supabase.auth.getSession();
-  return data.session;
+  try {
+    const { data, error } = await supabase.auth.getSession();
+    if (error) {
+      console.warn('Supabase getSession error:', error.message);
+      return null;
+    }
+    return data.session;
+  } catch (err) {
+    console.warn('Supabase getSession exception:', err);
+    return null;
+  }
 }
 
 export async function getCurrentUser(): Promise<SupabaseUser | null> {
   if (!supabase) return null;
-  const { data } = await supabase.auth.getUser();
-  return data.user;
+  try {
+    const { data, error } = await supabase.auth.getUser();
+    if (error) {
+      console.warn('Supabase getUser error:', error.message);
+      return null;
+    }
+    return data.user;
+  } catch (err) {
+    console.warn('Supabase getUser exception:', err);
+    return null;
+  }
 }
 
 export async function signInWithPassword(email: string, password: string) {
@@ -188,59 +216,70 @@ export function mapGoalToRow(userId: string, goal: Goal): CloudGoalRow {
 export async function fetchUserData(userId: string) {
   if (!supabase) return null;
 
-  try {
-    const [habitsRes, goalsRes, completionsRes, profileRes] = await Promise.all([
-      supabase.from('habits').select('*').eq('user_id', userId).order('created_at', { ascending: true }),
-      supabase.from('goals').select('*').eq('user_id', userId).order('created_at', { ascending: true }),
-      supabase.from('completions').select('*').eq('user_id', userId),
-      supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
-    ]);
+  const [habitsRes, goalsRes, completionsRes, profileRes] = await Promise.all([
+    supabase.from('habits').select('*').eq('user_id', userId).order('created_at', { ascending: true }),
+    supabase.from('goals').select('*').eq('user_id', userId).order('created_at', { ascending: true }),
+    supabase.from('completions').select('*').eq('user_id', userId),
+    supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
+  ]);
 
-    const habits: Habit[] = (habitsRes.data || []).map(mapRowToHabit);
-    const goals: Goal[] = (goalsRes.data || []).map(mapRowToGoal);
-    
-    const completions: Record<string, DayCompletionRecord> = {};
-    (completionsRes.data || []).forEach((row: CloudCompletionRow) => {
-      completions[row.date] = {
-        date: row.date,
-        completedHabitIds: Array.isArray(row.completed_habit_ids) ? row.completed_habit_ids : [],
-        note: row.note || undefined,
-        mood: (row.mood as DayCompletionRecord['mood']) || undefined,
-      };
-    });
+  if (habitsRes.error) throw habitsRes.error;
+  if (goalsRes.error) throw goalsRes.error;
+  if (completionsRes.error) throw completionsRes.error;
+  if (profileRes.error) throw profileRes.error;
 
-    return {
-      habits,
-      goals,
-      completions,
-      profile: profileRes.data as CloudProfileRow | null,
+  const habits: Habit[] = (habitsRes.data || []).map(mapRowToHabit);
+  const goals: Goal[] = (goalsRes.data || []).map(mapRowToGoal);
+  
+  const completions: Record<string, DayCompletionRecord> = {};
+  (completionsRes.data || []).forEach((row: CloudCompletionRow) => {
+    completions[row.date] = {
+      date: row.date,
+      completedHabitIds: Array.isArray(row.completed_habit_ids) ? row.completed_habit_ids : [],
+      note: row.note || undefined,
+      mood: (row.mood as DayCompletionRecord['mood']) || undefined,
     };
-  } catch (err) {
-    console.error('Error fetching Supabase cloud data:', err);
-    return null;
-  }
+  });
+
+  return {
+    habits,
+    goals,
+    completions,
+    profile: profileRes.data as CloudProfileRow | null,
+  };
 }
 
 export async function syncHabitToCloud(userId: string, habit: Habit) {
   if (!supabase) return;
   const row = mapHabitToRow(userId, habit);
-  await supabase.from('habits').upsert(row, { onConflict: 'id' });
+  const { error } = await supabase.from('habits').upsert(row, { onConflict: 'id' });
+  if (error) throw error;
+}
+
+export async function syncHabitsBatchToCloud(userId: string, habits: Habit[]) {
+  if (!supabase || habits.length === 0) return;
+  const rows = habits.map((h) => mapHabitToRow(userId, h));
+  const { error } = await supabase.from('habits').upsert(rows, { onConflict: 'id' });
+  if (error) throw error;
 }
 
 export async function deleteHabitFromCloud(userId: string, habitId: string) {
   if (!supabase) return;
-  await supabase.from('habits').delete().eq('user_id', userId).eq('id', habitId);
+  const { error } = await supabase.from('habits').delete().eq('user_id', userId).eq('id', habitId);
+  if (error) throw error;
 }
 
 export async function syncGoalToCloud(userId: string, goal: Goal) {
   if (!supabase) return;
   const row = mapGoalToRow(userId, goal);
-  await supabase.from('goals').upsert(row, { onConflict: 'id' });
+  const { error } = await supabase.from('goals').upsert(row, { onConflict: 'id' });
+  if (error) throw error;
 }
 
 export async function deleteGoalFromCloud(userId: string, goalId: string) {
   if (!supabase) return;
-  await supabase.from('goals').delete().eq('user_id', userId).eq('id', goalId);
+  const { error } = await supabase.from('goals').delete().eq('user_id', userId).eq('id', goalId);
+  if (error) throw error;
 }
 
 export async function syncCompletionToCloud(
@@ -258,7 +297,8 @@ export async function syncCompletionToCloud(
     note: note || null,
     mood: mood || null,
   };
-  await supabase.from('completions').upsert(payload, { onConflict: 'user_id,date' });
+  const { error } = await supabase.from('completions').upsert(payload, { onConflict: 'user_id,date' });
+  if (error) throw error;
 }
 
 export async function uploadLocalDataToCloud(
@@ -272,13 +312,15 @@ export async function uploadLocalDataToCloud(
   // 1. Upload Habits
   if (habits.length > 0) {
     const habitRows = habits.map((h) => mapHabitToRow(userId, h));
-    await supabase.from('habits').upsert(habitRows, { onConflict: 'id' });
+    const { error: hErr } = await supabase.from('habits').upsert(habitRows, { onConflict: 'id' });
+    if (hErr) throw hErr;
   }
 
   // 2. Upload Goals
   if (goals.length > 0) {
     const goalRows = goals.map((g) => mapGoalToRow(userId, g));
-    await supabase.from('goals').upsert(goalRows, { onConflict: 'id' });
+    const { error: gErr } = await supabase.from('goals').upsert(goalRows, { onConflict: 'id' });
+    if (gErr) throw gErr;
   }
 
   // 3. Upload Completions
@@ -291,6 +333,7 @@ export async function uploadLocalDataToCloud(
   }));
 
   if (completionRows.length > 0) {
-    await supabase.from('completions').upsert(completionRows, { onConflict: 'user_id,date' });
+    const { error: cErr } = await supabase.from('completions').upsert(completionRows, { onConflict: 'user_id,date' });
+    if (cErr) throw cErr;
   }
 }

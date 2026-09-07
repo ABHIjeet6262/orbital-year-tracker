@@ -8,8 +8,8 @@ create table if not exists public.profiles (
   name text,
   email text,
   circle_palette text default 'forest_dark',
-  circle_tone text default 'dark',
-  page_theme text default 'dark',
+  circle_tone text default 'dark' check (circle_tone in ('bright', 'dark')),
+  page_theme text default 'dark' check (page_theme in ('light', 'dark')),
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
@@ -20,7 +20,7 @@ create table if not exists public.habits (
   user_id uuid references auth.users(id) on delete cascade not null,
   name text not null,
   description text,
-  frequency text not null default 'daily',
+  frequency text not null default 'daily' check (frequency in ('daily', 'weekdays', 'weekends')),
   category text,
   color text,
   start_date text not null,
@@ -50,13 +50,18 @@ create table if not exists public.completions (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references auth.users(id) on delete cascade not null,
   date text not null, -- YYYY-MM-DD
-  completed_habit_ids jsonb not null default '[]'::jsonb,
+  completed_habit_ids jsonb not null default '[]'::jsonb check (jsonb_typeof(completed_habit_ids) = 'array'),
   note text,
-  mood text,
+  mood text check (mood is null or mood in ('great', 'good', 'neutral', 'tired', 'bad')),
   created_at timestamptz default now(),
   updated_at timestamptz default now(),
   constraint unique_user_date unique (user_id, date)
 );
+
+-- Indexes for optimal performance
+create index if not exists idx_habits_user on public.habits(user_id);
+create index if not exists idx_goals_user on public.goals(user_id);
+create index if not exists idx_completions_user_date on public.completions(user_id, date);
 
 -- ==============================================================================
 -- ROW-LEVEL SECURITY (RLS) POLICIES

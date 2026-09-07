@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useTracker } from '../../context/TrackerContext';
 import {
@@ -21,6 +21,7 @@ import {
   signUpWithPassword,
   signInWithMagicLink,
   signOutCloud,
+  generateUniqueId,
 } from '../../lib/supabase';
 
 interface AuthModalProps {
@@ -42,26 +43,50 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
+  // Password Strength Evaluator
+  const passwordStrength = useMemo(() => {
+    if (!password) return { label: '', score: 0, color: 'bg-stone-300' };
+    let score = 0;
+    if (password.length >= 6) score += 1;
+    if (password.length >= 8) score += 1;
+    if (/[A-Z]/.test(password)) score += 1;
+    if (/[0-9]/.test(password) || /[^A-Za-z0-9]/.test(password)) score += 1;
+
+    if (score <= 1) return { label: 'Weak', score: 1, color: 'bg-rose-500' };
+    if (score <= 3) return { label: 'Fair', score: 2, color: 'bg-amber-500' };
+    return { label: 'Strong', score: 3, color: 'bg-emerald-500' };
+  }, [password]);
+
   if (!isOpen) return null;
+
+  const isValidEmail = (str: string) => {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(str.trim());
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
     setSuccessMsg('');
 
+    if (!isValidEmail(email)) {
+      setErrorMsg('Please enter a valid email address (e.g. name@domain.com).');
+      return;
+    }
+
+    if (tab !== 'magic' && password.length < 6) {
+      setErrorMsg('Password must be at least 6 characters long.');
+      return;
+    }
+
     if (!isCloudConnected) {
       // Local fallback mode when Supabase is not configured
-      if (!email) {
-        setErrorMsg('Please enter an email address.');
-        return;
-      }
       setUser({
-        id: `local-user-${Date.now()}`,
+        id: generateUniqueId('local-user'),
         name: name.trim() || email.split('@')[0],
         email: email.trim(),
-        isGuest: false,
+        isGuest: true, // Marked as guest with personalized name for clean semantics
       });
-      setSuccessMsg('Account created locally on this device!');
+      setSuccessMsg('Profile personalized and saved locally on this device!');
       setTimeout(() => {
         setSuccessMsg('');
         onClose();
@@ -85,9 +110,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
           if (mergeLocalData) {
             await syncLocalToCloud();
           }
-          setSuccessMsg('Account created and local data synced!');
+          setSuccessMsg('Account created and local data synced to cloud!');
         } else {
-          setSuccessMsg('Confirmation email sent! Please verify your inbox to complete sign up.');
+          setSuccessMsg('Confirmation email sent! Please check your inbox to complete verification.');
         }
       } else if (tab === 'signin') {
         const { data, error } = await signInWithPassword(email, password);
@@ -103,7 +128,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
           if (mergeLocalData) {
             await syncLocalToCloud();
           }
-          setSuccessMsg('Signed in! Your yearly progress is active.');
+          setSuccessMsg('Signed in! Cloud synchronization active.');
         }
       } else if (tab === 'magic') {
         const { error } = await signInWithMagicLink(email);
@@ -132,7 +157,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
       setSuccessMsg('All current habits, goals & history synced to cloud!');
       setTimeout(() => setSuccessMsg(''), 2500);
     } else {
-      setErrorMsg('Failed to sync to cloud. Please check your connection.');
+      setErrorMsg('Failed to sync to cloud. Please check your network connection.');
       setTimeout(() => setErrorMsg(''), 3000);
     }
   };
@@ -253,7 +278,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
               className="w-full py-2 text-xs font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-xl border border-rose-200 dark:border-rose-900/50 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <LogOut size={13} />
-              <span>Switch to Guest Mode / Sign Out</span>
+              <span>Sign Out / Return to Guest</span>
             </button>
           </div>
         ) : (
@@ -345,9 +370,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
               {tab !== 'magic' && (
                 <div>
-                  <label className="block text-[11px] font-semibold text-stone-600 dark:text-stone-300 uppercase tracking-wider mb-1">
-                    Password
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[11px] font-semibold text-stone-600 dark:text-stone-300 uppercase tracking-wider">
+                      Password
+                    </label>
+                    {tab === 'signup' && password && (
+                      <span className="text-[10px] text-stone-500 font-medium">
+                        Strength: <strong className={passwordStrength.score >= 3 ? 'text-emerald-600 dark:text-emerald-400' : passwordStrength.score === 2 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'}>{passwordStrength.label}</strong>
+                      </span>
+                    )}
+                  </div>
                   <div className="relative">
                     <Lock
                       size={14}
@@ -363,6 +395,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                       className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50/50 dark:bg-stone-800 text-stone-900 dark:text-stone-100 focus:outline-hidden focus:ring-1 focus:ring-emerald-600"
                     />
                   </div>
+
+                  {/* Password Strength Progress Bar */}
+                  {tab === 'signup' && password && (
+                    <div className="w-full h-1 bg-stone-100 dark:bg-stone-800 rounded-full mt-1.5 overflow-hidden flex gap-0.5">
+                      <div className={`h-full flex-1 transition-all ${passwordStrength.score >= 1 ? passwordStrength.color : 'opacity-20 bg-stone-400'}`} />
+                      <div className={`h-full flex-1 transition-all ${passwordStrength.score >= 2 ? passwordStrength.color : 'opacity-20 bg-stone-400'}`} />
+                      <div className={`h-full flex-1 transition-all ${passwordStrength.score >= 3 ? passwordStrength.color : 'opacity-20 bg-stone-400'}`} />
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -403,8 +444,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
             <div className="text-[11px] text-stone-400 dark:text-stone-500 text-center leading-relaxed">
               {isCloudConnected
-                ? '🔒 End-to-end encrypted sessions with PostgreSQL Row-Level Security.'
-                : '💡 Cloud credentials optional — all data is saved securely to your browser.'}
+                ? '🔒 Protected with PostgreSQL Row-Level Security and encrypted tokens.'
+                : '💡 All tracker data is saved securely to your browser storage.'}
             </div>
           </div>
         )}

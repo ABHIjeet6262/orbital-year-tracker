@@ -18,6 +18,9 @@ import {
   Cloud,
   CloudOff,
   RefreshCw,
+  AlertTriangle,
+  CheckCircle2,
+  XCircle,
 } from 'lucide-react';
 import { AuthModal } from '../auth/AuthModal';
 import { YearlyStatsModal } from '../stats/YearlyStatsModal';
@@ -42,7 +45,15 @@ export const Header: React.FC = () => {
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isStatsOpen, setIsStatsOpen] = useState(false);
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const showToast = (text: string, type: 'success' | 'error') => {
+    setToastMessage({ text, type });
+    setTimeout(() => setToastMessage(null), 3000);
+  };
 
   const handleExport = () => {
     const dataStr = exportDataJSON();
@@ -54,6 +65,7 @@ export const Header: React.FC = () => {
     link.click();
     URL.revokeObjectURL(url);
     setShowSettingsMenu(false);
+    showToast('Tracker data exported (PII scrubbed)', 'success');
   };
 
   const handleImportClick = () => {
@@ -70,13 +82,14 @@ export const Header: React.FC = () => {
       if (content) {
         const success = importDataJSON(content);
         if (success) {
-          alert('Data imported successfully!');
+          showToast('Data verified & imported successfully!', 'success');
         } else {
-          alert('Failed to import data. Please check the JSON format.');
+          showToast('Invalid backup file. Import rejected for safety.', 'error');
         }
       }
     };
     reader.readAsText(file);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handlePrint = () => {
@@ -84,11 +97,10 @@ export const Header: React.FC = () => {
     setShowSettingsMenu(false);
   };
 
-  const handleReset = () => {
-    if (confirm('Reset tracker data to sample 2026 dataset?')) {
-      resetToSampleData();
-      setShowSettingsMenu(false);
-    }
+  const handleConfirmReset = () => {
+    resetToSampleData();
+    setShowResetConfirm(false);
+    showToast('Reset to default dataset', 'success');
   };
 
   return (
@@ -285,7 +297,10 @@ export const Header: React.FC = () => {
                   </button>
                   <div className="my-1 border-t border-stone-100 dark:border-stone-700" />
                   <button
-                    onClick={handleReset}
+                    onClick={() => {
+                      setShowSettingsMenu(false);
+                      setShowResetConfirm(true);
+                    }}
                     className="w-full text-left px-3.5 py-2 flex items-center gap-2 hover:bg-stone-50 dark:hover:bg-stone-700 text-rose-600 dark:text-rose-400 cursor-pointer"
                   >
                     <RotateCcw size={14} /> Reset to Sample Data
@@ -296,6 +311,55 @@ export const Header: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* In-App Toast Notification */}
+      {toastMessage && (
+        <div className="fixed bottom-5 right-5 z-50 animate-in slide-in-from-bottom-3 duration-200">
+          <div className={`flex items-center gap-2 px-4 py-2.5 rounded-xl shadow-xl text-xs font-medium border ${
+            toastMessage.type === 'success'
+              ? 'bg-emerald-900 text-emerald-100 border-emerald-700'
+              : 'bg-rose-900 text-rose-100 border-rose-700'
+          }`}>
+            {toastMessage.type === 'success' ? (
+              <CheckCircle2 size={16} className="text-emerald-300" />
+            ) : (
+              <XCircle size={16} className="text-rose-300" />
+            )}
+            <span>{toastMessage.text}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal for Reset */}
+      {showResetConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
+          <div className="w-full max-w-sm bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-2xl shadow-2xl p-6 animate-in zoom-in-95">
+            <div className="flex items-center gap-3 text-rose-600 dark:text-rose-400 mb-3">
+              <AlertTriangle size={22} />
+              <h3 className="font-serif text-lg font-medium text-stone-900 dark:text-stone-100">
+                Reset Tracker Data?
+              </h3>
+            </div>
+            <p className="text-xs text-stone-600 dark:text-stone-400 leading-relaxed mb-5">
+              This will replace all current habits, goals, and completion logs with the default sample dataset. This action cannot be undone.
+            </p>
+            <div className="flex items-center justify-end gap-2.5">
+              <button
+                onClick={() => setShowResetConfirm(false)}
+                className="px-4 py-2 text-xs font-medium text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-xl transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmReset}
+                className="px-4 py-2 text-xs font-medium bg-rose-600 hover:bg-rose-700 text-white rounded-xl transition-colors cursor-pointer"
+              >
+                Yes, Reset All
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Hidden File Input for JSON import */}
       <input

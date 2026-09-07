@@ -89,20 +89,24 @@ export const LandingPage: React.FC = () => {
 
   // Generate realistic sample completion pattern for the landing hero
   const getDemoDayProgress = (mIndex: number, dayNum: number): DayProgress => {
-    const daysInM = getDaysInMonth(2026, mIndex);
-    const isValid = dayNum <= daysInM;
-    const dateStr = formatDateString(2026, mIndex, dayNum);
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+    const currentDay = now.getDate();
 
-    // September 6 is today
-    const isToday = mIndex === 8 && dayNum === 6;
-    const isPast = mIndex < 8 || (mIndex === 8 && dayNum < 6);
+    const daysInM = getDaysInMonth(currentYear, mIndex);
+    const isValid = dayNum <= daysInM;
+    const dateStr = formatDateString(currentYear, mIndex, dayNum);
+
+    const isToday = mIndex === currentMonth && dayNum === currentDay;
+    const isPast = mIndex < currentMonth || (mIndex === currentMonth && dayNum < currentDay);
 
     if (!isValid) {
       return {
         dateString: dateStr,
         dayOfMonth: dayNum,
         monthIndex: mIndex,
-        year: 2026,
+        year: currentYear,
         totalHabits: 0,
         completedCount: 0,
         percentage: 0,
@@ -120,7 +124,7 @@ export const LandingPage: React.FC = () => {
         dateString: dateStr,
         dayOfMonth: dayNum,
         monthIndex: mIndex,
-        year: 2026,
+        year: currentYear,
         totalHabits: 4,
         completedCount: todayDoneCount,
         percentage: todayPct,
@@ -156,7 +160,7 @@ export const LandingPage: React.FC = () => {
         dateString: dateStr,
         dayOfMonth: dayNum,
         monthIndex: mIndex,
-        year: 2026,
+        year: currentYear,
         totalHabits: 4,
         completedCount: done,
         percentage: pct,
@@ -174,7 +178,7 @@ export const LandingPage: React.FC = () => {
       dateString: dateStr,
       dayOfMonth: dayNum,
       monthIndex: mIndex,
-      year: 2026,
+      year: currentYear,
       totalHabits: 4,
       completedCount: 0,
       percentage: 0,
